@@ -5,8 +5,9 @@ import ElectionProcessResult from "@/components/election-process-result";
 import Header from "@/components/header";
 import StatisticsCards from "@/components/statistics-cards";
 import homeStyles from "@/styles/homeStyles";
+import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { SafeAreaView, ScrollView, Text, View } from "react-native";
 
 const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,19 +86,48 @@ const HomeScreen = () => {
   ];
 
   return (
-    <View style={homeStyles.container}>
-      <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-
+    <SafeAreaView style={homeStyles.container}>
       <ScrollView
-        style={homeStyles.content}
+        style={homeStyles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        <StatisticsCards cards={memberStatsCards} />
-        <ElectionProcessResult cards={electionCards} />
-      </ScrollView>
+        <View style={homeStyles.container}>
+          <Header />
+          <ScrollView
+            style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="home-sharp" size={24} color="#333" />
+              <Text style={{ fontSize: 20, fontWeight: "bold", marginLeft: 8 }}>
+                Home
+              </Text>
+              <View
+                style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: "#ccc",
+                  marginLeft: 16,
+                }}
+              />
+            </View>
+          </ScrollView>
 
+          <ScrollView
+            style={homeStyles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <StatisticsCards cards={memberStatsCards} />
+            <ElectionProcessResult cards={electionCards} />
+          </ScrollView>
+        </View>
+      </ScrollView>
       <BottomNavigation />
-    </View>
+    </SafeAreaView>
   );
 };
 

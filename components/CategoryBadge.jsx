@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
+// SA HOME
+
 const CategoryBadge = ({ category }) => {
   const getBadgeStyle = (cat) => {
     switch (cat) {

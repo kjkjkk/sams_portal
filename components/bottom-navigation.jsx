@@ -28,7 +28,10 @@ const BottomNavigation = () => {
         <Ionicons name="time" size={24} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navItem}>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => router.push("/dtrlogs")}
+      >
         <Ionicons name="folder" size={24} color="#fff" />
       </TouchableOpacity>
 

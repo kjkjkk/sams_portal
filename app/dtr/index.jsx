@@ -1,12 +1,11 @@
-import Imageicn from "@/assets/images/Imageicn.png";
 import BottomNavigation from "@/components/bottom-navigation";
 import DTRTable from "@/components/DTRTable";
+import Header from "@/components/header";
 import dtrStyles from "@/styles/dtrStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useState } from "react";
 import {
-  Image,
   SafeAreaView,
   ScrollView,
   Text,
@@ -168,7 +167,7 @@ const DTRScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header Section */}
-        <View style={dtrStyles.header}>
+        {/* <View style={dtrStyles.header}>
           <View style={dtrStyles.headerContent}>
             <Text style={dtrStyles.welcomeText}>Welcome to INFINITLMS</Text>
             <View style={dtrStyles.userSection}>
@@ -180,7 +179,8 @@ const DTRScreen = () => {
             <Ionicons name="bulb" size={48} color="#FF9500" />
             <Text style={dtrStyles.logoText}>INFINIT LMS</Text>
           </View>
-        </View>
+        </View> */}
+        <Header />
 
         {/* DTR Title Section */}
         <View style={dtrStyles.dtrHeaderContainer}>
