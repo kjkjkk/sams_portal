@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import {
   FlatList,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
 } from "react-native";
 
 const DTRTable = ({ data }) => {
+  const router = useRouter();
   const renderRow = ({ item, index }) => (
     <View
       style={[styles.tableRow, index % 2 === 0 && styles.tableRowAlternate]}
@@ -23,8 +25,11 @@ const DTRTable = ({ data }) => {
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="pencil-sharp" size={20} color="#4CAF50" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="trash" size={20} color="#FF5252" />
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/dtrlogs")}
+        >
+          <Ionicons name="eye-sharp" size={20} color="#008cffff" />
         </TouchableOpacity>
       </View>
     </View>
