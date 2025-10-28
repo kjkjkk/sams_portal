@@ -279,10 +279,7 @@ const NewsScreen = () => {
         <View style={newStyles.newsList}>
           {filteredNews.length > 0 ? (
             filteredNews.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => handleNewsItemPress(item)}
-              >
+              <TouchableOpacity>
                 <NewsItem item={item} />
               </TouchableOpacity>
             ))
