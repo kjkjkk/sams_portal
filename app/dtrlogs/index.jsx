@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 // import { Clock } from "lucide-react";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";
 
-const NewsDetailScreen = () => {
+const dtrLogs = () => {
   return (
     <SafeAreaView style={newStyles.container}>
       <ScrollView
@@ -14,23 +14,6 @@ const NewsDetailScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ flex: 1, backgroundColor: "white" }}>
-          {/* Header Section */}
-          {/* <View style={newStyles.header}>
-            <View style={newStyles.headerContent}>
-              <Text style={newStyles.welcomeText}>Welcome to INFINITLMS</Text>
-              <View style={newStyles.userSection}>
-                <Image
-                  source={require("@/assets/images/Imageicn.png")}
-                  style={newStyles.userAvatar}
-                />
-                <Text style={newStyles.userName}>Whang D. Oda</Text>
-              </View>
-            </View>
-            <View style={newStyles.logoSection}>
-              <Ionicons name="bulb" size={48} color="#FF9500" />
-              <Text style={newStyles.logoText}>INFINIT LMS</Text>
-            </View>
-          </View> */}
           <Header />
 
           {/* Main Content */}
@@ -65,7 +48,7 @@ const NewsDetailScreen = () => {
               {/* My DTR Entry Log */}
               <View style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ color: "#0d9488", fontSize: 18 }}>▶</Text>
+                  <Text style={{ color: "#FF7700", fontSize: 18 }}>▶</Text>
                   <Text
                     style={{
                       fontSize: 16,
@@ -74,7 +57,7 @@ const NewsDetailScreen = () => {
                       marginLeft: 8,
                     }}
                   >
-                    Pinning Garcia Entry Log
+                    My DTR Entry Log
                   </Text>
                 </View>
               </View>
@@ -91,4 +74,4 @@ const NewsDetailScreen = () => {
   );
 };
 
-export default NewsDetailScreen;
+export default dtrLogs;

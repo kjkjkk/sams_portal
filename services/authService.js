@@ -1,50 +1,76 @@
-import { ID } from "react-native-appwrite";
-import { account } from "./appwrite";
+import { getApiUrl } from "./mysql-config";
 
 const authService = {
-  // Register a user
   async register(email, password) {
     try {
-      const response = await account.create(ID.unique(), email, password);
-      return response;
+      const response = await fetch(getApiUrl("/api/register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { error: data.error || "Registration failed" };
+      }
+      return data;
     } catch (error) {
-      return {
-        error: error.message || "Registration failed. Please try agian",
-      };
+      return { error: error.message || "Registration failed" };
     }
   },
-  // Login
+
   async login(email, password) {
     try {
-      const response = await account.createEmailPasswordSession(
-        email,
-        password
-      );
-      return response;
+      const response = await fetch(getApiUrl("/api/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { error: data.error || "Login failed" };
+      }
+      // Store user data locally
+      await this._storeUser(data);
+      return data;
     } catch (error) {
-      return {
-        error: error.message || "Login failed. Please check your credentials",
-      };
+      return { error: error.message || "Login failed" };
     }
   },
-  // Get logged in user
+
   async getUser() {
     try {
-      return await account.get();
+      const user = await this._getStoredUser();
+      return user || null;
     } catch (error) {
       return null;
     }
   },
 
-  // Logout user
   async logout() {
     try {
-      await account.deleteSession("current");
+      await this._clearUser();
+      return { success: true };
     } catch (error) {
-      return {
-        error: error.message || "Logout failed. Please try again",
-      };
+      return { error: error.message || "Logout failed" };
     }
+  },
+
+  // Helper: Store user data locally
+  async _storeUser(user) {
+    // You can use AsyncStorage or similar for persistence
+    // For now, this is a placeholder
+  },
+
+  // Helper: Get stored user data
+  async _getStoredUser() {
+    // Retrieve from AsyncStorage or similar
+    // For now, this is a placeholder
+    return null;
+  },
+
+  // Helper: Clear user data
+  async _clearUser() {
+    // Clear from AsyncStorage or similar
   },
 };
 

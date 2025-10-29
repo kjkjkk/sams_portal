@@ -8,8 +8,8 @@ export default function LoginLayout() {
         animation: "none",
       }}
     >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="home" />
+      {/* <Stack.Screen name="index" />
+      <Stack.Screen name="home" /> */}
     </Stack>
   );
 }

@@ -8,7 +8,7 @@ export default function DTRLayout() {
         animation: "none",
       }}
     >
-      <Stack.Screen name="index" />
+      {/* <Stack.Screen name="index" /> */}
     </Stack>
   );
 }
