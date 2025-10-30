@@ -7,7 +7,10 @@ const config = {
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DB_ID,
   collections: {
     notes: process.env.EXPO_PUBLIC_APPWRITE_COL_NOTES_ID,
+    dtrSamsCard: process.env.EXPO_PUBLIC_APPWRITE_COL_DTR_SAMS_CARD_ID,
+    schoolaccounts: process.env.EXPO_PUBLIC_APPWRITE_COL_SCHOOLACCOUNTS_ID,
     users: process.env.EXPO_PUBLIC_APPWRITE_COL_USERS_ID,
+    users2: process.env.EXPO_PUBLIC_APPWRITE_COL_USERS2_ID,
   },
 };
 
@@ -16,11 +19,11 @@ console.log("Appwrite Config:", {
   endpoint: config.endpoint,
   projectId: config.projectId,
   databaseId: config.databaseId,
-  hasUsers: !!config.collections.users,
+  collections: config.collections,
 });
 
 // Validate required config
-if (!config.endpoint || !config.projectId) {
+if (!config.endpoint || !config.projectId || !config.databaseId) {
   console.error("❌ Missing Appwrite credentials! Check your .env file");
 }
 
