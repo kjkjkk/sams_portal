@@ -1,147 +1,119 @@
-// import { createContext, useContext, useEffect, useState } from "react";
-// import authService from "../services/authService";
+import { config, database } from "@/services/appwrite";
+import { Query } from "appwrite";
+import { createContext, useContext, useState } from "react";
 
-// const AuthContext = createContext();
+const AuthContext = createContext(undefined);
 
-// export const AuthProvider = ({ children }) => {
-//   const [user, setUser] = useState(null);
-//   const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-//   useEffect(() => {
-//     checkUser();
-//   }, []);
-
-//   const checkUser = async () => {
-//     setLoading(true);
-//     const response = await authService.getUser();
-
-//     if (response?.error) {
-//       setUser(null);
-//     } else {
-//       setUser(response);
-//     }
-
-//     setLoading(false);
-//   };
-
-//   const login = async (email, password) => {
-//     const response = await authService.login(email, password);
-
-//     if (response?.error) {
-//       return response;
-//     }
-
-//     await checkUser();
-//     return { success: true };
-//   };
-
-//   const register = async (email, password) => {
-//     const response = await authService.register(email, password);
-
-//     if (response?.error) {
-//       return response;
-//     }
-
-//     return login(email, password); // Auto-login after register
-//   };
-
-//   const logout = async () => {
-//     await authService.logout();
-//     setUser(null);
-//     await checkUser();
-//   };
-
-//   return (
-//     <AuthContext.Provider
-//       value={{
-//         user,
-//         login,
-//         register,
-//         logout,
-//         loading,
-//       }}
-//     >
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// };
-
-// export const useAuth = () => useContext(AuthContext);
-
-import { getApiUrl } from "../services/mysql-config";
-
-const authService = {
-  async register(email, password) {
+  const login = async (email, password) => {
     try {
-      const response = await fetch(getApiUrl("/api/register"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return { error: data.error || "Registration failed" };
+      setError(null);
+      setLoading(true);
+
+      console.log("[AuthContext] Attempting login for:", email);
+
+      // Query YOUR database directly (no Appwrite Auth!)
+      const response = await database.listDocuments(
+        config.databaseId,
+        config.collections.users2,
+        [Query.equal("email", email.trim().toLowerCase())]
+      );
+
+      console.log(
+        "[AuthContext] Query result:",
+        response.documents.length,
+        "users found"
+      );
+
+      if (response.documents.length === 0) {
+        throw new Error("User not found. Please check your email.");
       }
-      return data;
-    } catch (error) {
-      return { error: error.message || "Registration failed" };
-    }
-  },
 
-  async login(email, password) {
-    try {
-      const response = await fetch(getApiUrl("/api/login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        return { error: data.error || "Login failed" };
+      const userDoc = response.documents[0];
+      console.log("[AuthContext] Found user:", userDoc.email);
+
+      // Check password (plaintext comparison - matches your database)
+      if (userDoc.password !== password) {
+        throw new Error("Invalid password. Please try again.");
       }
-      // Store user data locally
-      await this._storeUser(data);
-      return data;
-    } catch (error) {
-      return { error: error.message || "Login failed" };
-    }
-  },
 
-  async getUser() {
+      // Check if std_id exists
+      if (!userDoc.std_id) {
+        throw new Error("User profile incomplete - missing student ID");
+      }
+
+      console.log("[AuthContext] Password correct! std_id:", userDoc.std_id);
+
+      // Build full name
+      const fullName =
+        userDoc.usrFirstName && userDoc.usrLastName
+          ? `${userDoc.usrFirstName} ${userDoc.usrLastName}`.trim()
+          : userDoc.email;
+
+      // Create user data object
+      const userData = {
+        id: userDoc.$id,
+        email: userDoc.email,
+        name: fullName,
+        stdId: userDoc.std_id,
+        usrFirstName: userDoc.usrFirstName || "",
+        usrLastName: userDoc.usrLastName || "",
+        accID: userDoc.accID || 0,
+        fullName: fullName,
+      };
+
+      console.log("[AuthContext] Login successful! User data:", userData);
+
+      setUser(userData);
+      return userData;
+    } catch (err) {
+      const errorMessage = err.message || "Login failed";
+      setError(errorMessage);
+      console.error("[AuthContext] Login error:", err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
     try {
-      const user = await this._getStoredUser();
-      return user || null;
-    } catch (error) {
-      return null;
+      setLoading(true);
+      setUser(null);
+      setError(null);
+      console.log("[AuthContext] Logout successful");
+    } catch (err) {
+      setError(err.message || "Logout failed");
+      console.error("[AuthContext] Logout error:", err);
+    } finally {
+      setLoading(false);
     }
-  },
+  };
 
-  async logout() {
-    try {
-      await this._clearUser();
-      return { success: true };
-    } catch (error) {
-      return { error: error.message || "Logout failed" };
-    }
-  },
-
-  // Helper: Store user data locally
-  async _storeUser(user) {
-    // You can use AsyncStorage or similar for persistence
-    // For now, this is a placeholder
-  },
-
-  // Helper: Get stored user data
-  async _getStoredUser() {
-    // Retrieve from AsyncStorage or similar
-    // For now, this is a placeholder
-    return null;
-  },
-
-  // Helper: Clear user data
-  async _clearUser() {
-    // Clear from AsyncStorage or similar
-  },
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        logout,
+        isAuthenticated: !!user && !!user.stdId,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-export default authService;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+};

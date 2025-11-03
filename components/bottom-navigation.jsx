@@ -1,9 +1,11 @@
+import { useAuth } from "@/contexts/AuthContexts"; // ✅ import auth context
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 
 const BottomNavigation = () => {
   const router = useRouter();
+  const { logout } = useAuth(); // ✅ get logout function
 
   return (
     <View style={styles.bottomNav}>
@@ -23,7 +25,7 @@ const BottomNavigation = () => {
 
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => router.push("/dtr")}
+        onPress={() => router.push("/dtrlogs")}
       >
         <Ionicons name="time" size={24} color="#fff" />
       </TouchableOpacity>
@@ -32,7 +34,8 @@ const BottomNavigation = () => {
         <Ionicons name="folder" size={24} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navItem}>
+      {/* ✅ Menu button logs out for now */}
+      <TouchableOpacity style={styles.navItem} onPress={logout}>
         <Ionicons name="menu" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
@@ -41,7 +44,7 @@ const BottomNavigation = () => {
 
 const styles = StyleSheet.create({
   bottomNav: {
-    position: "absolute", // ✅ makes it sticky/fixed
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -50,17 +53,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     justifyContent: "space-around",
     alignItems: "center",
-
-    // ✅ Add shadow for better appearance
     borderTopWidth: 1,
     borderTopColor: "#444",
-    elevation: 10, // Android shadow
+    elevation: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-
-    // ✅ Avoid overlap with safe areas on iOS
     paddingBottom: Platform.OS === "ios" ? 20 : 12,
   },
   navItem: {
