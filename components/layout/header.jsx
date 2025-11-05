@@ -7,8 +7,7 @@ import { Image, StyleSheet, Text, View } from "react-native";
 
 const Header = () => {
   const { user } = useAuth();
-  const [schoolName, setSchoolName] = useState("INFINIT LMS");
-  const [schoolName2, setSchoolName2] = useState("INFINIT LMS");
+  const [schoolName, setSchoolName] = useState("INFINIT");
 
   const fullName = user?.fullName || "Guest User";
 
@@ -25,7 +24,7 @@ const Header = () => {
 
         if (res.documents.length > 0) {
           const school = res.documents[0];
-          setSchoolName(school.accName || "Unknown School");
+          setSchoolName(school.accName2 || "Unknown School");
         }
       } catch (err) {
         console.error("[Header] Failed to fetch school name:", err);
@@ -35,31 +34,8 @@ const Header = () => {
     fetchSchoolName();
   }, [user?.accID]);
 
-  useEffect(() => {
-    const fetchSchoolName2 = async () => {
-      try {
-        if (!user?.accID) return;
-
-        const res = await database.listDocuments(
-          config.databaseId,
-          config.collections.schoolaccounts,
-          [Query.equal("schoolid", user.accID)] // match user's school
-        );
-
-        if (res.documents.length > 0) {
-          const school = res.documents[0];
-          setSchoolName2(school.accName2 || "Unknown School");
-        }
-      } catch (err) {
-        console.error("[Header] Failed to fetch school name:", err);
-      }
-    };
-
-    fetchSchoolName2();
-  }, [user?.accID]);
-
   const renderSchoolName = () => {
-    if (schoolName2.toUpperCase() === "UM") {
+    if (schoolName.toUpperCase() === "UM") {
       return (
         <Text style={styles.welcomeText}>
           <Text style={{ color: "#D00000" }}>U</Text>
@@ -70,9 +46,7 @@ const Header = () => {
     }
     // Else, default color black
     return (
-      <Text style={[styles.logoText, { color: "#000" }]}>
-        {schoolName2} LMS
-      </Text>
+      <Text style={[styles.logoText, { color: "#000" }]}>{schoolName} LMS</Text>
     );
   };
 

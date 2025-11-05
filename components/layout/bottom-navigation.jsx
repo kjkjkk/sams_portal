@@ -1,4 +1,4 @@
-import { useAuth } from "@/contexts/AuthContexts"; // ✅ import auth context
+import { useAuth } from "@/contexts/AuthContexts";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -11,21 +11,21 @@ const BottomNavigation = () => {
     <View style={styles.bottomNav}>
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => router.push("/home")}
+        onPress={() => router.push("/screens/home")}
       >
         <Ionicons name="home" size={24} color="#fff" />
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => router.push("/news")}
+        onPress={() => router.push("/screens/news")}
       >
         <Ionicons name="list" size={24} color="#fff" />
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => router.push("/dtrlogs")}
+        onPress={() => router.push("/screens/dtrlogs")}
       >
         <Ionicons name="time" size={24} color="#fff" />
       </TouchableOpacity>

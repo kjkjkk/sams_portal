@@ -1,6 +1,6 @@
-import BottomNavigation from "@/components/bottom-navigation";
-import DTRTable from "@/components/DTRTable";
-import Header from "@/components/header";
+import DTRTable from "@/components/DTRScreen/DTRTable";
+import BottomNavigation from "@/components/layout/bottom-navigation";
+import Header from "@/components/layout/header";
 import dtrStyles from "@/styles/dtrStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";

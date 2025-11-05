@@ -1,16 +1,15 @@
-import BottomNavigation from "@/components/bottom-navigation";
-import DTRTable from "@/components/DTRLog";
-import Header from "@/components/header";
-import newStyles from "@/styles/newsStyles";
+import DTRLog from "@/components/DTRScreen/DTRLog";
+import BottomNavigation from "@/components/layout/bottom-navigation";
+import Header from "@/components/layout/header";
+import dtrLogStyles from "@/styles/dtrLogStyles";
 import { Ionicons } from "@expo/vector-icons";
-// import { Clock } from "lucide-react";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";
 
 const dtrLogs = () => {
   return (
-    <SafeAreaView style={newStyles.container}>
+    <SafeAreaView style={dtrLogStyles.container}>
       <ScrollView
-        style={newStyles.scrollView}
+        style={dtrLogStyles.scrollView}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -63,7 +62,7 @@ const dtrLogs = () => {
               </View>
 
               {/* Table */}
-              <DTRTable />
+              <DTRLog />
             </View>
           </ScrollView>
         </View>

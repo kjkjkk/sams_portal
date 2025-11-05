@@ -1,10 +1,10 @@
 "use client";
 
-import BottomNavigation from "@/components/bottom-navigation";
-import Header from "@/components/header";
+import BottomNavigation from "@/components/layout/bottom-navigation";
+import Header from "@/components/layout/header";
+import NewsItem from "@/components/NewsScreen/NewsItem";
 import newStyles from "@/styles/newsStyles";
 import { Ionicons } from "@expo/vector-icons";
-// import { useRoute } from "expo-router";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useState } from "react";
 import {
@@ -15,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import NewsItem from "../../components/NewsItem";
 
 const NewsScreen = () => {
   const route = useRoute();

@@ -233,7 +233,7 @@ const DTRLog = () => {
               style={[
                 dtrLogStyles.tableCell,
                 dtrLogStyles.tableHeader,
-                { width: 120 },
+                { width: 140 },
               ]}
             >
               Name
@@ -242,7 +242,7 @@ const DTRLog = () => {
               style={[
                 dtrLogStyles.tableCell,
                 dtrLogStyles.tableHeader,
-                { width: 100 },
+                { width: 80 },
               ]}
             >
               School
@@ -309,10 +309,10 @@ const DTRLog = () => {
               >
                 {index + 1}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 120 }]}>
+              <Text style={[dtrLogStyles.tableCell, { width: 140 }]}>
                 {String(item.name)}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 100 }]}>
+              <Text style={[dtrLogStyles.tableCell, { width: 80 }]}>
                 {String(item.school)}
               </Text>
               <Text style={[dtrLogStyles.tableCell, { width: 100 }]}>

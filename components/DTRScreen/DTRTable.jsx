@@ -239,7 +239,7 @@ const DTRTable = ({ data }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => router.push("/dtrlogs")}
+                onPress={() => router.push("/screens/dtrlogs")}
               >
                 <Ionicons name="eye-sharp" size={20} color="#008cffff" />
               </TouchableOpacity>

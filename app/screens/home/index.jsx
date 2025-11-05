@@ -1,8 +1,6 @@
-"use client";
-
-import BottomNavigation from "@/components/bottom-navigation";
 import ElectionProcessResult from "@/components/election-process-result";
-import Header from "@/components/header";
+import BottomNavigation from "@/components/layout/bottom-navigation";
+import Header from "@/components/layout/header";
 import StatisticsCards from "@/components/statistics-cards";
 import homeStyles from "@/styles/homeStyles";
 import { Ionicons } from "@expo/vector-icons";

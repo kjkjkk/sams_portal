@@ -1,7 +1,6 @@
-"use client";
-
 import Logo1 from "@/assets/images/Logo1.png";
 import { useAuth } from "@/contexts/AuthContexts";
+import loginStyles from "@/styles/loginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -15,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import loginStyles from "../../styles/loginStyles";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -28,7 +26,7 @@ export default function LoginScreen() {
   useEffect(() => {
     if (isAuthenticated && user?.stdId) {
       console.log("[Login] User already authenticated, redirecting to home");
-      router.replace("/home");
+      router.replace("/screens/home");
     }
   }, [isAuthenticated, user, router]);
 
@@ -47,7 +45,7 @@ export default function LoginScreen() {
 
       console.log("[Login] Login successful, navigating to home");
       // Navigate to home after successful login
-      router.replace("/home");
+      router.replace("/screens/home");
     } catch (error) {
       console.error("[Login] Login error:", error);
       Alert.alert(
