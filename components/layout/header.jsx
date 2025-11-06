@@ -48,7 +48,7 @@ const Header = () => {
 
   const getSchoolDisplayName = () => {
     if (loading) return "...";
-    return schoolData?.accName2 || schoolData?.accName || "INFINIT";
+    return schoolData?.accName2 || schoolData?.accName || "INFINITTTT";
   };
 
   const renderSchoolLogo = () => {
@@ -59,6 +59,15 @@ const Header = () => {
         <Text style={styles.logoText}>
           <Text style={{ color: "#D00000" }}>U</Text>
           <Text style={{ color: "#FFD000" }}>M </Text>
+          LMS
+        </Text>
+      );
+    }
+    if (displayName.toUpperCase() === "INFINIT") {
+      return (
+        <Text style={styles.logoText}>
+          <Text style={{ color: "#171717ff" }}>INFIN</Text>
+          <Text style={{ color: "#ff8400ff" }}>IT </Text>
           LMS
         </Text>
       );
@@ -78,12 +87,16 @@ const Header = () => {
           Welcome to {getSchoolDisplayName()} LMS
         </Text>
         <View style={styles.userSection}>
-          <Image
+          {/* <Image
             source={
               user?.usrImage
                 ? { uri: user.usrImage }
                 : require("@/assets/images/Imageicn.png")
             }
+            style={styles.userAvatar}
+          /> */}
+          <Image
+            source={require("@/assets/images/Imageicn.png")}
             style={styles.userAvatar}
           />
           <Text style={styles.userName}>{fullName}</Text>

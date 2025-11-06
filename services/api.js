@@ -53,7 +53,6 @@ class ApiService {
 
       console.log("[API] Response status:", response.status);
 
-      // Handle 401 Unauthorized (token expired/invalid)
       if (response.status === 401) {
         console.log("[API] Unauthorized - clearing token");
         await this.clearToken();
@@ -85,8 +84,6 @@ class ApiService {
 
   /**
    * Login user
-   * @param {string} username - usrUserName from users table
-   * @param {string} password - usrPassword from users table
    */
   async login(username, password) {
     const data = await this.request("/login", {
@@ -97,7 +94,6 @@ class ApiService {
       }),
     });
 
-    // New backend returns flat user object in data
     if (data.success && data.data && data.data.token) {
       await this.setToken(data.data.token);
     }
@@ -107,7 +103,6 @@ class ApiService {
 
   /**
    * Get authenticated user data
-   * Backend returns flat user object with all fields from users table
    */
   async getUser() {
     return await this.request("/user", {
@@ -117,8 +112,6 @@ class ApiService {
 
   /**
    * Get school information by accID
-   * Fetches from schoolaccounts table using accID (primary key)
-   * @param {number} accID - Account ID from users.accID
    */
   async getSchool(accID) {
     return await this.request(`/schools/${accID}`, {
@@ -143,7 +136,6 @@ class ApiService {
 
   /**
    * Get bulletins for a specific school
-   * @param {number} accID - Account ID (optional, could filter by school)
    */
   async getBulletins(accID = null) {
     const endpoint = accID ? `/bulletins?accID=${accID}` : "/bulletins";
@@ -154,7 +146,6 @@ class ApiService {
 
   /**
    * Get news for a specific school
-   * @param {number} accID - Account ID from news.accID
    */
   async getNews(accID = null) {
     const endpoint = accID ? `/news?accID=${accID}` : "/news";
@@ -164,13 +155,37 @@ class ApiService {
   }
 
   /**
-   * Get DTR records for user
-   * @param {number} empId - Employee ID (users.usrID maps to dtr_sams_card.emp_id)
+   * Get DTR records for specific user
+   * @param {number} empId - Employee ID (users.usrID)
    */
   async getDTRRecords(empId) {
     return await this.request(`/dtr/${empId}`, {
       method: "GET",
     });
+  }
+
+  /**
+   * Get all DTR records (for admins)
+   * Falls back to alternative endpoint if primary fails
+   */
+  async getAllDTRRecords() {
+    try {
+      return await this.request("/dtr", {
+        method: "GET",
+      });
+    } catch (error) {
+      console.log("[API] Trying fallback endpoint for DTR records...");
+      try {
+        return await this.request("/dtr/all", {
+          method: "GET",
+        });
+      } catch (fallbackError) {
+        console.error("[API] Both DTR endpoints failed:", fallbackError);
+        throw new Error(
+          "DTR endpoint not found. Please check your backend API has GET /dtr or GET /dtr/all endpoint."
+        );
+      }
+    }
   }
 }
 

@@ -1,108 +1,78 @@
+"use client";
 import { useAuth } from "@/contexts/AuthContexts";
-import { config, database } from "@/services/appwrite";
-import dtrLogStyles from "@/styles/dtrLogStyles";
-import { Query } from "appwrite";
+import ApiService from "@/services/api";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
-  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-
 const DTRLog = () => {
-  const { user, loading: authLoading } = useAuth();
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const params = useLocalSearchParams();
+  const { user } = useAuth(); // Get the authenticated user object
   const [dtrData, setDtrData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [totalRecords, setTotalRecords] = useState(0);
+
+  // 1. Construct the Full Name from the local 'user' object
+  const authenticatedUserFullName =
+    user?.usrFirstName && user?.usrLastName
+      ? `${user.usrFirstName} ${user.usrLastName}`
+      : user?.usrUserName || "Employee";
+
+  // Determine the user ID to fetch
+  const targetUsrId = params.usrId || user?.usrID;
+
+  // Determine the name to display in headers
+  const headerDisplayName = authenticatedUserFullName;
 
   useEffect(() => {
-    const fetchDTRData = async () => {
-      console.log("[DTR] User state:", user);
-      console.log("[DTR] stdId:", user?.stdId);
+    if (!targetUsrId) {
+      setLoading(false);
+      setError("Cannot determine a user ID to fetch DTR records.");
+      return;
+    }
 
+    const fetchUserDTR = async () => {
       try {
         setLoading(true);
+        console.log("[DTRDetails] Fetching DTR for targetUsrId:", targetUsrId);
 
-        if (!user || !user.stdId || user.stdId === 0) {
-          console.log("[DTR] No valid user or stdId");
-          setError("User ID not found");
-          setLoading(false);
-          return;
-        }
+        const userIdToFetch = Number.parseInt(targetUsrId);
 
-        console.log("[DTR] Fetching records for stdId:", user.stdId);
+        // Fetch DTR records
+        const response = await ApiService.getDTRRecords(userIdToFetch);
 
-        const dtrRecords = await database.listDocuments(
-          config.databaseId,
-          config.collections.dtrSamsCard,
-          [
-            Query.equal("std_id", user.stdId),
-            Query.orderDesc("tme_date"),
-            Query.limit(rowsPerPage),
-            Query.offset((currentPage - 1) * rowsPerPage),
-          ]
-        );
+        if (response.success && response.data) {
+          const records = response.data;
 
-        console.log("[DTR] Found records:", dtrRecords.documents.length);
+          // --- 🛑 Step 1: Data Enrichment (Fetching School Names) ---
+          // Collect unique acc_id (school ID) from DTR records
+          const accIDs = [...new Set(records.map((r) => r.acc_id))].filter(
+            (id) => id
+          );
+          const schoolMap = {};
 
-        // Get total count for pagination
-        const totalRecordsResult = await database.listDocuments(
-          config.databaseId,
-          config.collections.dtrSamsCard,
-          [
-            Query.equal("std_id", user.stdId),
-            Query.limit(1), // Just get count, don't need actual data
-          ]
-        );
-        setTotalRecords(totalRecordsResult.total);
+          if (accIDs.length > 0) {
+            // Fetch school names concurrently
+            const schoolPromises = accIDs.map((id) => ApiService.getSchool(id));
+            const schoolsResponses = await Promise.all(schoolPromises);
 
-        // Get unique school IDs from DTR records
-        const accIDs = [
-          ...new Set(dtrRecords.documents.map((r) => r.accID)),
-        ].filter((id) => id);
-        console.log("[DTR] Unique accIDs:", accIDs);
-
-        const schoolMap = {};
-
-        // Fetch school names for each unique accID
-        if (accIDs.length > 0) {
-          try {
-            // Get all schools at once
-            const schoolsResponse = await database.listDocuments(
-              config.databaseId,
-              config.collections.schoolaccounts,
-              [Query.limit(100)] // Get all schools
-            );
-
-            console.log(
-              "[DTR] Schools fetched:",
-              schoolsResponse.documents.length
-            );
-
-            // Map schools by their schoolid
-            schoolsResponse.documents.forEach((school) => {
-              if (school.schoolid) {
+            schoolsResponses.forEach((res) => {
+              if (res.success && res.data) {
+                const school = res.data;
+                // Map the ID (schoolid) to the name (accName or accName2)
                 schoolMap[school.schoolid] =
                   school.accName2 || school.accName || "Unknown School";
               }
             });
-
-            console.log("[DTR] School map:", schoolMap);
-          } catch (schoolErr) {
-            console.error("[DTR] Error fetching schools:", schoolErr);
           }
-        }
+          // -----------------------------------------------------------
 
-        const enrichedData = dtrRecords.documents.map((record) => {
           const formatTime = (datetime) => {
             if (!datetime) return "N/A";
             try {
@@ -127,65 +97,42 @@ const DTRLog = () => {
             }
           };
 
-          return {
-            id: record.$id || "N/A",
-            name: user.fullName || "Student",
-            school: schoolMap[record.accID] || "Unknown",
-            timeInAM: formatTime(record.tme_am_in),
-            timeOutAM: formatTime(record.tme_am_out),
-            timeInPM: formatTime(record.tme_pm_in),
-            timeOutPM: formatTime(record.tme_pm_out),
-            date: formatDate(record.tme_date),
-          };
-        });
+          const formattedData = records.map((record) => {
+            return {
+              id: record.tme_id || "N/A",
+              name: authenticatedUserFullName,
+              // 🛑 Step 2: Use the school map to get the school name
+              school: schoolMap[record.acc_id] || "Unknown School",
+              timeInAM: formatTime(record.tme_am_in),
+              timeOutAM: formatTime(record.tme_am_out),
+              timeInPM: formatTime(record.tme_pm_in),
+              timeOutPM: formatTime(record.tme_pm_out),
+              date: formatDate(record.tme_date),
+            };
+          });
 
-        console.log("[DTR] Enriched data:", enrichedData.length, "records");
-        setDtrData(enrichedData);
-        setError(null);
+          setDtrData(formattedData);
+          setError(null);
+        } else {
+          throw new Error(response.message || "Failed to fetch DTR records");
+        }
       } catch (err) {
-        console.error("[DTR] DTR fetch error:", err);
+        console.error("[DTRDetails] Fetch error:", err);
         setError(`Failed to load DTR data: ${err.message || "Unknown error"}`);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!authLoading && user?.stdId) {
-      fetchDTRData();
-    } else if (!authLoading && !user) {
-      setLoading(false);
-    } else if (!authLoading && user?.stdId === 0) {
-      setLoading(false);
-      setError("User ID not found");
-    }
-  }, [user?.stdId, authLoading, currentPage, rowsPerPage]);
+    fetchUserDTR();
+  }, [targetUsrId, authenticatedUserFullName]);
 
-  const totalPages = Math.ceil(totalRecords / rowsPerPage) || 1;
-
-  const handlePreviousPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <View style={dtrLogStyles.centerContainer}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#FF8C00" />
-        <Text style={dtrLogStyles.loadingText}>
-          Loading your DTR records...
-        </Text>
-      </View>
-    );
-  }
-
-  if (!user) {
-    return (
-      <View style={dtrLogStyles.centerContainer}>
-        <Text style={dtrLogStyles.errorText}>
-          Please log in to view your DTR records
+        <Text style={styles.loadingText}>
+          Loading {headerDisplayName} DTR records...
         </Text>
       </View>
     );
@@ -193,176 +140,188 @@ const DTRLog = () => {
 
   if (error) {
     return (
-      <View style={dtrLogStyles.centerContainer}>
-        <Text style={dtrLogStyles.errorText}>{error}</Text>
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>⚠️ {error}</Text>
       </View>
     );
   }
 
   if (dtrData.length === 0) {
     return (
-      <View style={dtrLogStyles.centerContainer}>
-        <Text style={dtrLogStyles.emptyText}>No DTR records found</Text>
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>
+          No DTR records found for {headerDisplayName}.
+        </Text>
       </View>
     );
   }
 
+  // --- JSX DISPLAY UPDATED ---
   return (
-    <ScrollView
-      style={dtrLogStyles.container}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <Text style={styles.headerTitle}>DTR Log for {headerDisplayName}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={dtrLogStyles.tableScroll}
+        style={styles.tableScroll}
       >
-        <View style={dtrLogStyles.table}>
-          {/* Table Header */}
-          <View style={dtrLogStyles.tableRow}>
-            <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 50 },
-              ]}
-            >
+        <View style={styles.table}>
+          {/* Table Header - School column ADDED BACK */}
+          <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 50 }]}>
               ID
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 140 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 150 }]}
             >
               Name
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 80 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 130 }]}
             >
               School
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 100 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
             >
               Time In (AM)
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 110 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 110 }]}
             >
               Time Out (AM)
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 100 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
             >
               Time In (PM)
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 110 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 110 }]}
             >
               Time Out (PM)
             </Text>
             <Text
-              style={[
-                dtrLogStyles.tableCell,
-                dtrLogStyles.tableHeader,
-                { width: 90 },
-              ]}
+              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
             >
               Date
             </Text>
           </View>
 
-          {/* Table Rows */}
+          {/* Table Rows - School cell ADDED BACK */}
           {dtrData.map((item, index) => (
             <View
-              key={item.id + index}
-              style={[
-                dtrLogStyles.tableRow,
-                index % 2 === 0 && dtrLogStyles.tableRowAlt,
-              ]}
+              // 🛑 Alternative Fix: Use the index if the DB ID is causing issues,
+              // but only if the list items won't be reordered, filtered, or deleted.
+              key={index}
+              style={[styles.tableRow, index % 2 !== 0 && styles.tableRowAlt]}
             >
-              <Text
-                style={[dtrLogStyles.tableCell, { width: 50 }]}
-                numberOfLines={1}
-              >
-                {index + 1}
+              <Text style={[styles.tableCell, { width: 50 }]}>{item.id}</Text>
+              <Text style={[styles.tableCell, { width: 150 }]}>
+                {item.name}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 140 }]}>
-                {String(item.name)}
+              {/* 🛑 ADDED: School Data Cell */}
+              <Text style={[styles.tableCell, { width: 130 }]}>
+                {item.school}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 80 }]}>
-                {String(item.school)}
+              <Text style={[styles.tableCell, { width: 100 }]}>
+                {item.timeInAM}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 100 }]}>
-                {String(item.timeInAM)}
+              <Text style={[styles.tableCell, { width: 110 }]}>
+                {item.timeOutAM}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 110 }]}>
-                {String(item.timeOutAM)}
+              <Text style={[styles.tableCell, { width: 100 }]}>
+                {item.timeInPM}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 100 }]}>
-                {String(item.timeInPM)}
+              <Text style={[styles.tableCell, { width: 110 }]}>
+                {item.timeOutPM}
               </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 110 }]}>
-                {String(item.timeOutPM)}
-              </Text>
-              <Text style={[dtrLogStyles.tableCell, { width: 90 }]}>
-                {String(item.date)}
+              <Text style={[styles.tableCell, { width: 100 }]}>
+                {item.date}
               </Text>
             </View>
           ))}
         </View>
       </ScrollView>
-
-      {/* Pagination Controls */}
-      <View style={dtrLogStyles.paginationContainer}>
-        <Pressable
-          style={[
-            dtrLogStyles.paginationButton,
-            currentPage === 1 && dtrLogStyles.paginationButtonDisabled,
-          ]}
-          onPress={handlePreviousPage}
-          disabled={currentPage === 1}
-        >
-          <Text style={dtrLogStyles.paginationButtonText}>Previous</Text>
-        </Pressable>
-        <Text style={dtrLogStyles.pageInfo}>
-          Page {currentPage} of {totalPages}
-        </Text>
-        <Pressable
-          style={[
-            dtrLogStyles.paginationButton,
-            currentPage === totalPages && dtrLogStyles.paginationButtonDisabled,
-          ]}
-          onPress={handleNextPage}
-          disabled={currentPage === totalPages}
-        >
-          <Text style={dtrLogStyles.paginationButtonText}>Next</Text>
-        </Pressable>
-      </View>
     </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  // Note: minWidth for the table has been adjusted to accommodate the new column.
+  container: {
+    flex: 1,
+    backgroundColor: "#fafafaff",
+    padding: 16,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  tableScroll: {
+    borderRadius: 8,
+    overflow: "hidden",
+    marginTop: 5,
+    elevation: 2, // Shadow for Android
+    shadowColor: "#000", // Shadow for iOS
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  table: {
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    overflow: "hidden",
+    minWidth: 850, // Adjusted for the extra 'School' column
+  },
+  tableHeader: {
+    backgroundColor: "#FF8C00",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    textAlign: "center",
+  },
+  tableCell: {
+    fontSize: 12,
+    color: "#111827",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRightWidth: 1,
+    borderRightColor: "#E5E7EB",
+    textAlign: "center",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  tableRowAlt: {
+    backgroundColor: "#f5f5f5",
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#FF0000",
+    textAlign: "center",
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#999",
+  },
+});
 
 export default DTRLog;

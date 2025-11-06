@@ -1,11 +1,15 @@
 import DTRLog from "@/components/DTRScreen/DTRLog";
 import BottomNavigation from "@/components/layout/bottom-navigation";
 import Header from "@/components/layout/header";
+import { useAuth } from "@/contexts/AuthContexts";
 import dtrLogStyles from "@/styles/dtrLogStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";
 
 const dtrLogs = () => {
+  const { user, getUserFullName } = useAuth();
+  const fullName = getUserFullName();
+
   return (
     <SafeAreaView style={dtrLogStyles.container}>
       <ScrollView
@@ -56,7 +60,7 @@ const dtrLogs = () => {
                       marginLeft: 8,
                     }}
                   >
-                    My DTR Entry Log
+                    {fullName}'s Log
                   </Text>
                 </View>
               </View>
