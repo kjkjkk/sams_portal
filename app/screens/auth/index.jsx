@@ -14,43 +14,38 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState(""); // Changed from email
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login, user, isAuthenticated } = useAuth();
 
-  // Redirect if already logged in
   useEffect(() => {
-    if (isAuthenticated && user?.stdId) {
+    if (isAuthenticated && user?.id) {
+      // Changed from stdId to id
       console.log("[Login] User already authenticated, redirecting to home");
       router.replace("/screens/home");
     }
   }, [isAuthenticated, user, router]);
 
   const handleLogin = async () => {
-    // Validation
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Email and password are required");
+    if (!username.trim() || !password.trim()) {
+      Alert.alert("Error", "Username and password are required");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Use the login function from AuthContext
-      await login(email.trim().toLowerCase(), password);
-
+      await login(username.trim(), password); // Removed toLowerCase() unless needed
       console.log("[Login] Login successful, navigating to home");
-      // Navigate to home after successful login
       router.replace("/screens/home");
     } catch (error) {
       console.error("[Login] Login error:", error);
       Alert.alert(
         "Login Failed",
-        error.message || "Invalid email or password. Please try again."
+        error.message || "Invalid username or password. Please try again."
       );
     } finally {
       setLoading(false);
@@ -71,23 +66,20 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      {/* Login Prompt */}
       <View style={loginStyles.promptSection}>
         <Text style={loginStyles.promptText}>Please login to continue</Text>
       </View>
 
-      {/* Form Section */}
       <View style={loginStyles.formSection}>
-        {/* Email Field */}
+        {/* Username Field */}
         <View style={loginStyles.fieldContainer}>
-          <Text style={loginStyles.label}>Email</Text>
+          <Text style={loginStyles.label}>Username</Text>
           <TextInput
             style={loginStyles.input}
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={setEmail}
+            placeholder="Enter your username"
+            value={username}
+            onChangeText={setUsername}
             placeholderTextColor="#999"
-            keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
           />
@@ -107,7 +99,6 @@ export default function LoginScreen() {
           />
         </View>
 
-        {/* Login Button */}
         <TouchableOpacity
           style={[loginStyles.loginButton, loading && { opacity: 0.6 }]}
           onPress={handleLogin}
@@ -123,12 +114,10 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Forgot Password Link */}
         <TouchableOpacity disabled={loading}>
           <Text style={loginStyles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
 
-        {/* Social Login Buttons */}
         <TouchableOpacity style={loginStyles.socialButton} disabled={loading}>
           <Ionicons name="logo-google" size={24} color="#4285F4" />
           <Text style={loginStyles.socialButtonText}>Sign in with Google</Text>
@@ -141,7 +130,6 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Footer Text */}
         <Text style={loginStyles.footerText}>
           © 2025 Advance Infinit Technology Solution Inc.
         </Text>

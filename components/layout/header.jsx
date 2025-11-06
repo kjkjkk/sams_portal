@@ -1,62 +1,89 @@
 import { useAuth } from "@/contexts/AuthContexts";
-import { config, database } from "@/services/appwrite"; // ✅ to access Appwrite
+import ApiService from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { Query } from "appwrite";
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 const Header = () => {
-  const { user } = useAuth();
-  const [schoolName, setSchoolName] = useState("INFINIT");
+  const { user, getUserFullName } = useAuth();
+  const [schoolData, setSchoolData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const fullName = user?.fullName || "Guest User";
+  const fullName = getUserFullName();
 
   useEffect(() => {
-    const fetchSchoolName = async () => {
+    const fetchSchoolData = async () => {
+      if (!user?.accID) {
+        console.log("[Header] No accID found, using default school");
+        setSchoolData({ accName2: "INFINIT", accName: "INFINIT" });
+        return;
+      }
+
       try {
-        if (!user?.accID) return;
+        setLoading(true);
+        console.log("[Header] Fetching school for accID:", user.accID);
 
-        const res = await database.listDocuments(
-          config.databaseId,
-          config.collections.schoolaccounts,
-          [Query.equal("schoolid", user.accID)] // match user's school
-        );
+        const response = await ApiService.getSchool(user.accID);
 
-        if (res.documents.length > 0) {
-          const school = res.documents[0];
-          setSchoolName(school.accName2 || "Unknown School");
+        if (response.success && response.data) {
+          setSchoolData(response.data);
+          console.log(
+            "[Header] School loaded:",
+            response.data.accName2 || response.data.accName
+          );
+        } else {
+          console.log("[Header] No school data found");
+          setSchoolData({ accName2: "INFINIT", accName: "INFINIT" });
         }
       } catch (err) {
-        console.error("[Header] Failed to fetch school name:", err);
+        console.error("[Header] Failed to fetch school:", err);
+        setSchoolData({ accName2: "INFINIT", accName: "INFINIT" });
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchSchoolName();
+    fetchSchoolData();
   }, [user?.accID]);
 
-  const renderSchoolName = () => {
-    if (schoolName.toUpperCase() === "UM") {
+  const getSchoolDisplayName = () => {
+    if (loading) return "...";
+    return schoolData?.accName2 || schoolData?.accName || "INFINIT";
+  };
+
+  const renderSchoolLogo = () => {
+    const displayName = getSchoolDisplayName();
+
+    if (displayName.toUpperCase() === "UM") {
       return (
-        <Text style={styles.welcomeText}>
+        <Text style={styles.logoText}>
           <Text style={{ color: "#D00000" }}>U</Text>
           <Text style={{ color: "#FFD000" }}>M </Text>
           LMS
         </Text>
       );
     }
-    // Else, default color black
+
     return (
-      <Text style={[styles.logoText, { color: "#000" }]}>{schoolName} LMS</Text>
+      <Text style={[styles.logoText, { color: "#000" }]}>
+        {displayName} LMS
+      </Text>
     );
   };
 
   return (
     <View style={styles.header}>
       <View style={styles.headerContent}>
-        <Text style={styles.welcomeText}>Welcome to {renderSchoolName()} </Text>
+        <Text style={styles.welcomeText}>
+          Welcome to {getSchoolDisplayName()} LMS
+        </Text>
         <View style={styles.userSection}>
           <Image
-            source={require("@/assets/images/Imageicn.png")}
+            source={
+              user?.usrImage
+                ? { uri: user.usrImage }
+                : require("@/assets/images/Imageicn.png")
+            }
             style={styles.userAvatar}
           />
           <Text style={styles.userName}>{fullName}</Text>
@@ -64,8 +91,7 @@ const Header = () => {
       </View>
       <View style={styles.logoSection}>
         <Ionicons name="bulb" size={48} color="#FF9500" />
-        {/* <Text style={styles.logoText}>{schoolName}</Text> */}
-        {renderSchoolName()}
+        {renderSchoolLogo()}
       </View>
     </View>
   );
