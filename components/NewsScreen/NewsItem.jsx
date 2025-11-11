@@ -1,8 +1,7 @@
+import CategoryBadge from "@/components/NewsScreen/CategoryBadge";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import CategoryBadge from "./CategoryBadge";
-
 // SA NEWS
 
 const NewsItem = ({ item }) => {

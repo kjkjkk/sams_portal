@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import StatCard from "./stat-card";
 
@@ -7,11 +6,6 @@ import StatCard from "./stat-card";
 const StatisticsCards = ({ cards }) => {
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name="home" size={24} color="#000" />
-        <Text style={styles.sectionTitle}>HOME</Text>
-      </View>
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

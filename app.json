@@ -3,7 +3,7 @@
     "name": "sams_portal",
     "slug": "sams_portal",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "samsportal",
     "userInterfaceStyle": "automatic",

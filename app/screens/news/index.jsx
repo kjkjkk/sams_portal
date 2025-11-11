@@ -1,13 +1,13 @@
 "use client";
 
-import BottomNavigation from "@/components/bottom-navigation";
-import newStyles from "@/styles/newsStyles";
+import BottomNavigation from "@/components/layout/bottom-navigation";
+import Header from "@/components/layout/header";
+import NewsItem from "@/components/NewsScreen/NewsItem";
+import newStyles from "@/styles/appScreenStyles/newsStyles";
 import { Ionicons } from "@expo/vector-icons";
-// import { useRoute } from "expo-router";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useState } from "react";
 import {
-  Image,
   SafeAreaView,
   ScrollView,
   Text,
@@ -15,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import NewsItem from "../../components/NewsItem";
 
 const NewsScreen = () => {
   const route = useRoute();
@@ -206,7 +205,7 @@ const NewsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header Section */}
-        <View style={newStyles.header}>
+        {/* <View style={newStyles.header}>
           <View style={newStyles.headerContent}>
             <Text style={newStyles.welcomeText}>Welcome to INFINITLMS</Text>
             <View style={newStyles.userSection}>
@@ -221,7 +220,8 @@ const NewsScreen = () => {
             <Ionicons name="bulb" size={48} color="#FF9500" />
             <Text style={newStyles.logoText}>INFINIT LMS</Text>
           </View>
-        </View>
+        </View> */}
+        <Header />
 
         {/* NEWS Title Section */}
         <View style={newStyles.newsHeaderContainer}>
@@ -278,10 +278,7 @@ const NewsScreen = () => {
         <View style={newStyles.newsList}>
           {filteredNews.length > 0 ? (
             filteredNews.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => handleNewsItemPress(item)}
-              >
+              <TouchableOpacity>
                 <NewsItem item={item} />
               </TouchableOpacity>
             ))
@@ -307,230 +304,5 @@ const getCategoryColor = (category) => {
   };
   return colors[category] || "#999";
 };
-
-// const newStyles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#fff",
-//   },
-//   scrollView: {
-//     flex: 1,
-//   },
-//   backButton: {
-//     paddingHorizontal: 16,
-//     paddingVertical: 12,
-//     marginTop: 8,
-//   },
-//   detailCard: {
-//     marginHorizontal: 16,
-//     marginBottom: 24,
-//     paddingHorizontal: 16,
-//     paddingVertical: 20,
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     borderColor: "#e0e0e0",
-//     backgroundColor: "#f9f9f9",
-//   },
-//   categoryBadge: {
-//     alignSelf: "flex-start",
-//     paddingHorizontal: 12,
-//     paddingVertical: 6,
-//     borderRadius: 16,
-//     marginBottom: 12,
-//   },
-//   categoryBadgeText: {
-//     color: "#fff",
-//     fontSize: 12,
-//     fontWeight: "700",
-//   },
-//   detailTitle: {
-//     fontSize: 18,
-//     fontWeight: "700",
-//     color: "#000",
-//     marginBottom: 16,
-//     lineHeight: 24,
-//   },
-//   detailImage: {
-//     width: "100%",
-//     height: 240,
-//     borderRadius: 8,
-//     marginBottom: 16,
-//   },
-//   detailSubtitle: {
-//     fontSize: 14,
-//     fontWeight: "600",
-//     color: "#333",
-//     marginBottom: 12,
-//     textAlign: "center",
-//   },
-//   detailDescription: {
-//     fontSize: 13,
-//     color: "#555",
-//     lineHeight: 20,
-//     marginBottom: 16,
-//   },
-//   hashtags: {
-//     fontSize: 12,
-//     color: "#666",
-//     fontWeight: "500",
-//     lineHeight: 18,
-//   },
-//   header: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "flex-start",
-//     paddingHorizontal: 16,
-//     paddingVertical: 20,
-//     borderBottomWidth: 1,
-//     borderBottomColor: "#f0f0f0",
-//   },
-//   headerContent: {
-//     flex: 1,
-//   },
-//   welcomeText: {
-//     fontSize: 20,
-//     fontWeight: "700",
-//     color: "#000",
-//     marginBottom: 12,
-//     letterSpacing: -0.5,
-//   },
-//   userSection: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 10,
-//   },
-//   userAvatar: {
-//     width: 44,
-//     height: 44,
-//     borderRadius: 22,
-//   },
-//   userName: {
-//     fontSize: 15,
-//     fontWeight: "600",
-//     color: "#333",
-//   },
-//   logoSection: {
-//     alignItems: "center",
-//     gap: 6,
-//   },
-//   logoText: {
-//     fontSize: 11,
-//     fontWeight: "700",
-//     color: "#666",
-//     letterSpacing: 0.5,
-//   },
-//   newsHeaderContainer: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     paddingHorizontal: 16,
-//     paddingVertical: 16,
-//     gap: 12,
-//   },
-//   newsIconContainer: {
-//     backgroundColor: "#000",
-//     width: 36,
-//     height: 36,
-//     borderRadius: 6,
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   newsTitle: {
-//     fontSize: 18,
-//     fontWeight: "700",
-//     color: "#000",
-//     letterSpacing: 0.5,
-//   },
-//   divider: {
-//     flex: 1,
-//     height: 1,
-//     backgroundColor: "#ddd",
-//     marginLeft: 4,
-//   },
-//   dropdownWrapper: {
-//     paddingHorizontal: 16,
-//     marginBottom: 12,
-//   },
-//   dropdown: {
-//     paddingHorizontal: 16,
-//     paddingVertical: 12,
-//     borderRadius: 24,
-//     borderWidth: 1,
-//     borderColor: "#ddd",
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     backgroundColor: "#f9f9f9",
-//   },
-//   dropdownText: {
-//     fontSize: 14,
-//     color: "#999",
-//     fontWeight: "500",
-//   },
-//   dropdownMenu: {
-//     marginTop: 4,
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     borderColor: "#ddd",
-//     backgroundColor: "#fff",
-//     overflow: "hidden",
-//   },
-//   dropdownItem: {
-//     paddingHorizontal: 16,
-//     paddingVertical: 12,
-//     borderBottomWidth: 1,
-//     borderBottomColor: "#f0f0f0",
-//   },
-//   dropdownItemText: {
-//     fontSize: 14,
-//     color: "#333",
-//     fontWeight: "500",
-//   },
-//   searchContainer: {
-//     flexDirection: "row",
-//     paddingHorizontal: 16,
-//     marginBottom: 16,
-//     gap: 10,
-//   },
-//   searchInput: {
-//     flex: 1,
-//     paddingHorizontal: 16,
-//     paddingVertical: 11,
-//     borderRadius: 22,
-//     borderWidth: 1,
-//     borderColor: "#ddd",
-//     fontSize: 14,
-//     backgroundColor: "#f9f9f9",
-//     color: "#333",
-//   },
-//   createButton: {
-//     backgroundColor: "#4CAF50",
-//     paddingHorizontal: 14,
-//     paddingVertical: 11,
-//     borderRadius: 22,
-//     flexDirection: "row",
-//     alignItems: "center",
-//     gap: 6,
-//     justifyContent: "center",
-//   },
-//   createButtonText: {
-//     color: "#fff",
-//     fontSize: 13,
-//     fontWeight: "600",
-//   },
-//   newsList: {
-//     paddingHorizontal: 16,
-//     paddingBottom: 24,
-//   },
-//   emptyState: {
-//     paddingVertical: 40,
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   emptyStateText: {
-//     fontSize: 16,
-//     color: "#999",
-//     fontWeight: "500",
-//   },
-// });
 
 export default NewsScreen;

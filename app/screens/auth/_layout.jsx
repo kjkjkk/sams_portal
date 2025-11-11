@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-export default function DTRLayout() {
+export default function LoginLayout() {
   return (
     <Stack
       screenOptions={{
@@ -8,7 +8,8 @@ export default function DTRLayout() {
         animation: "none",
       }}
     >
-      <Stack.Screen name="index" />
+      {/* <Stack.Screen name="index" />
+      <Stack.Screen name="home" /> */}
     </Stack>
   );
 }
