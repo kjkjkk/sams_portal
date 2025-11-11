@@ -6,7 +6,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,89 +13,75 @@ import {
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-
-const DTRTable = () => {
+const DTRTable = ({ selectedUserType, searchText }) => {
   const { user, loading: authLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [allDtrData, setAllDtrData] = useState([]);
-  const [dtrData, setDtrData] = useState([]);
+  const [rowsPerPage] = useState(10);
+  const [allUsers, setAllUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [displayedUsers, setDisplayedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [selectedUserType, setSelectedUserType] = useState("all");
-  const [userTypes, setUserTypes] = useState([]);
   const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        console.log("[DTRTable] Fetching all DTR records...");
+        console.log("[DTRTable] ===== Fetching all DTR records =====");
 
         // Fetch DTR records
         const dtrResponse = await ApiService.getAllDTRRecords();
+        console.log("[DTRTable] API Response received");
 
         if (dtrResponse.success && dtrResponse.data) {
           const records = dtrResponse.data;
+          console.log("[DTRTable] Total records received:", records.length);
 
-          const formattedData = records.map((record) => {
-            const formatTime = (datetime) => {
-              if (!datetime) return "N/A";
-              try {
-                const d = new Date(datetime);
-                return d.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-              } catch {
-                return datetime;
+          // Group records by user to get unique users
+          const userMap = new Map();
+
+          records.forEach((record) => {
+            const userId = record.emp_id || record.usr_id;
+
+            if (!userMap.has(userId)) {
+              userMap.set(userId, {
+                usr_id: userId,
+                emp_name: record.emp_name || record.user_name || "Unknown",
+                school_name:
+                  record.school_name || record.acc_name || "Unknown School",
+                acc_id: record.acc_id,
+                user_type: record.user_type || record.usrType,
+                user_type_name:
+                  record.user_type_name || record.type_name || "Unknown",
+                total_records: 1,
+                latest_date: record.tme_date,
+              });
+            } else {
+              // Increment record count for this user
+              const existing = userMap.get(userId);
+              existing.total_records += 1;
+
+              // Update to latest date if newer
+              if (new Date(record.tme_date) > new Date(existing.latest_date)) {
+                existing.latest_date = record.tme_date;
               }
-            };
-
-            const formatDate = (datetime) => {
-              if (!datetime) return "N/A";
-              try {
-                const d = new Date(datetime);
-                return d.toISOString().split("T")[0];
-              } catch {
-                return datetime;
-              }
-            };
-
-            return {
-              id: record.tme_id || "N/A",
-              emp_name: record.emp_name || "Unknown",
-              emp_id: record.emp_id,
-              usr_id: record.usr_id,
-              user_type: record.user_type || "unknown",
-              user_type_name: record.user_type_name || "Unknown",
-              date: formatDate(record.tme_date),
-              timeInAM: formatTime(record.tme_am_in),
-              timeOutAM: formatTime(record.tme_am_out),
-              timeInPM: formatTime(record.tme_pm_in),
-              timeOutPM: formatTime(record.tme_pm_out),
-              regTotal: record.tme_reg_total || 0,
-              remarks: record.tme_remarks || "—",
-            };
+            }
           });
 
-          setAllDtrData(formattedData);
-          setTotalRecords(formattedData.length);
+          // Convert map to array
+          const uniqueUsers = Array.from(userMap.values());
+          console.log("[DTRTable] Unique users:", uniqueUsers.length);
+          console.log("[DTRTable] Sample user data:", uniqueUsers.slice(0, 2));
 
-          // Extract unique user types
-          const uniqueTypes = [
-            ...new Set(formattedData.map((d) => d.user_type_name)),
-          ];
-          setUserTypes(uniqueTypes);
-
+          setAllUsers(uniqueUsers);
           setError(null);
         } else {
           throw new Error(dtrResponse.message || "Failed to fetch DTR records");
         }
       } catch (err) {
-        console.error("[DTRTable] Fetch error:", err);
+        console.error("[DTRTable] ===== ERROR =====");
+        console.error("[DTRTable] Error message:", err.message);
         setError(`Failed to load DTR data: ${err.message || "Unknown error"}`);
       } finally {
         setLoading(false);
@@ -105,37 +90,100 @@ const DTRTable = () => {
 
     if (!authLoading && user && isAdminUser(user.usrType)) {
       fetchData();
+    } else if (!authLoading && user && !isAdminUser(user.usrType)) {
+      setLoading(false);
     }
   }, [authLoading, user]);
 
   useEffect(() => {
-    let filteredData = allDtrData;
+    console.log("[DTRTable] Filter effect triggered");
+    console.log("[DTRTable] selectedUserType:", selectedUserType);
+    console.log("[DTRTable] searchText:", searchText);
+    console.log("[DTRTable] allUsers count:", allUsers.length);
 
-    if (selectedUserType !== "all") {
-      filteredData = allDtrData.filter(
-        (item) => item.user_type_name === selectedUserType
+    let filtered = [...allUsers];
+
+    // Filter by user type (if selectedUserType is not null/"All")
+    if (selectedUserType !== null && selectedUserType !== undefined) {
+      console.log("[DTRTable] Filtering by user type:", selectedUserType);
+      const beforeFilter = filtered.length;
+
+      filtered = filtered.filter((item) => {
+        const matches = Number(item.user_type) === Number(selectedUserType);
+        if (!matches && beforeFilter < 20) {
+          console.log(
+            `[DTRTable] User ${item.emp_name}: user_type=${item.user_type} vs selectedUserType=${selectedUserType}`
+          );
+        }
+        return matches;
+      });
+
+      console.log(
+        `[DTRTable] After user type filter: ${beforeFilter} -> ${filtered.length}`
       );
     }
 
-    setTotalRecords(filteredData.length);
+    // Filter by search text
+    if (searchText && searchText.trim() !== "") {
+      console.log("[DTRTable] Filtering by search text:", searchText);
+      const searchLower = searchText.toLowerCase();
+      const beforeSearch = filtered.length;
+
+      filtered = filtered.filter((item) => {
+        const name = item.emp_name?.toLowerCase() || "";
+        const school = item.school_name?.toLowerCase() || "";
+        const type = item.user_type_name?.toLowerCase() || "";
+        const id = String(item.usr_id || "");
+
+        return (
+          name.includes(searchLower) ||
+          school.includes(searchLower) ||
+          type.includes(searchLower) ||
+          id.includes(searchLower)
+        );
+      });
+
+      console.log(
+        `[DTRTable] After search filter: ${beforeSearch} -> ${filtered.length}`
+      );
+    }
+
+    setFilteredUsers(filtered);
 
     // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
-    const paginatedData = filteredData.slice(
-      startIndex,
-      startIndex + rowsPerPage
-    );
-    setDtrData(paginatedData);
-  }, [selectedUserType, currentPage, rowsPerPage, allDtrData]);
+    const paginated = filtered.slice(startIndex, startIndex + rowsPerPage);
+    setDisplayedUsers(paginated);
 
-  const handleViewUser = (usrId) => {
+    console.log(
+      `[DTRTable] Displaying ${paginated.length} users on page ${currentPage}`
+    );
+
+    // Reset to page 1 if current page exceeds total pages
+    const totalPages = Math.ceil(filtered.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [selectedUserType, searchText, currentPage, rowsPerPage, allUsers]);
+
+  const handleViewUser = (userId) => {
+    console.log("[DTRTable] ===== Navigating to DTR logs =====");
+    console.log("[DTRTable] userId:", userId);
+
+    if (!userId) {
+      console.error("[DTRTable] No valid user ID found!");
+      return;
+    }
+
     router.push({
       pathname: "/screens/dtrlogs",
-      params: { usrId: String(usrId) },
+      params: {
+        usrId: String(userId),
+      },
     });
   };
 
-  const totalPages = Math.ceil(totalRecords / rowsPerPage) || 1;
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage) || 1;
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
@@ -149,11 +197,21 @@ const DTRTable = () => {
     }
   };
 
+  const formatDate = (datetime) => {
+    if (!datetime) return "N/A";
+    try {
+      const d = new Date(datetime);
+      return d.toISOString().split("T")[0];
+    } catch {
+      return "N/A";
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FF8C00" />
-        <Text style={styles.loadingText}>Loading DTR records...</Text>
+        <ActivityIndicator size="large" color="#F97316" />
+        <Text style={styles.loadingText}>Loading users...</Text>
       </View>
     );
   }
@@ -176,109 +234,114 @@ const DTRTable = () => {
     );
   }
 
-  if (allDtrData.length === 0) {
+  if (allUsers.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyText}>No DTR records found</Text>
+        <Text style={styles.emptyText}>No users found</Text>
+      </View>
+    );
+  }
+
+  if (filteredUsers.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>
+          No users match your search criteria
+        </Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Table Section */}
-      <View style={styles.table}>
-        {/* Table Header */}
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 50 }]}>
-            ID
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 120 }]}>
-            Employee
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 90 }]}>
-            Type
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 90 }]}>
-            Date
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-            Time In (AM)
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-            Time Out (AM)
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-            Time In (PM)
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-            Time Out (PM)
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 100 }]}>
-            Total Hours
-          </Text>
-          <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-            Actions
-          </Text>
-        </View>
-
-        {/* Table Rows */}
-        {dtrData.map((item, index) => (
-          <View
-            key={item.id + index}
-            style={[styles.tableRow, index % 2 === 0 && styles.tableRowAlt]}
-          >
-            <Text style={[styles.tableCell, { width: 50 }]}>{item.id}</Text>
-            <Text style={[styles.tableCell, { width: 120 }]}>
-              {item.emp_name}
+    <View style={styles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.cardsScrollView}
+      >
+        {/* Table Section */}
+        <View style={styles.table}>
+          {/* Table Header */}
+          <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
+              User ID
             </Text>
-            <Text style={[styles.tableCell, { width: 90 }]}>
-              {item.user_type_name}
-            </Text>
-            <Text style={[styles.tableCell, { width: 90 }]}>{item.date}</Text>
-            <Text style={[styles.tableCell, { width: 80 }]}>
-              {item.timeInAM}
-            </Text>
-            <Text style={[styles.tableCell, { width: 80 }]}>
-              {item.timeOutAM}
-            </Text>
-            <Text style={[styles.tableCell, { width: 80 }]}>
-              {item.timeInPM}
-            </Text>
-            <Text style={[styles.tableCell, { width: 80 }]}>
-              {item.timeOutPM}
-            </Text>
-            <Text style={[styles.tableCell, { width: 100 }]}>
-              {item.regTotal}
-            </Text>
-            <View
-              style={[
-                styles.tableCell,
-                {
-                  width: 80,
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  gap: 8,
-                },
-              ]}
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 200 }]}
             >
-              <Pressable
-                style={styles.actionButton}
-                onPress={() => handleViewUser(item.usr_id)}
-              >
-                <Text style={styles.actionButtonText}>👁️</Text>
-              </Pressable>
-              <Pressable
-                style={styles.actionButton}
-                onPress={() => handleViewUser(item.usr_id)}
-              >
-                <Text style={styles.actionButtonText}>✏️</Text>
-              </Pressable>
-            </View>
+              Name
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 160 }]}
+            >
+              School
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+            >
+              User Type
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
+            >
+              Total Records
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
+            >
+              Latest Log
+            </Text>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
+              Actions
+            </Text>
           </View>
-        ))}
-      </View>
 
+          {/* Table Rows */}
+          {displayedUsers.map((item, index) => (
+            <View
+              key={`user-${item.usr_id}-${index}`}
+              style={[styles.tableRow, index % 2 === 1 && styles.tableRowAlt]}
+            >
+              <Text style={[styles.tableCell, { width: 80 }]}>
+                {item.usr_id}
+              </Text>
+              <Text style={[styles.tableCell, { width: 200 }]}>
+                {item.emp_name}
+              </Text>
+              <Text style={[styles.tableCell, { width: 160 }]}>
+                {item.school_name}
+              </Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>
+                {item.user_type_name}
+              </Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>
+                {item.total_records}
+              </Text>
+              <Text style={[styles.tableCell, { width: 100 }]}>
+                {formatDate(item.latest_date)}
+              </Text>
+              <View
+                style={[
+                  styles.tableCell,
+                  {
+                    width: 80,
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 8,
+                  },
+                ]}
+              >
+                <Pressable
+                  style={styles.actionButton}
+                  onPress={() => handleViewUser(item.usr_id)}
+                >
+                  <Text style={styles.actionButtonText}>👁️</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
       {/* Pagination Controls */}
       <View style={styles.paginationContainer}>
         <Pressable
@@ -291,9 +354,11 @@ const DTRTable = () => {
         >
           <Text style={styles.paginationButtonText}>Previous</Text>
         </Pressable>
+
         <Text style={styles.pageInfo}>
-          Page {currentPage} of {totalPages}
+          Page {currentPage} of {totalPages} ({filteredUsers.length} users)
         </Text>
+
         <Pressable
           style={[
             styles.paginationButton,
@@ -305,66 +370,33 @@ const DTRTable = () => {
           <Text style={styles.paginationButtonText}>Next</Text>
         </Pressable>
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fafafaff",
-    padding: 16,
-  },
-  filterScroll: {
-    marginBottom: 16,
-  },
-  filterContainer: {
-    flexDirection: "row",
-    gap: 8,
-    paddingRight: 16,
-  },
-  filterButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-  },
-  filterButtonActive: {
-    backgroundColor: "#FF8C00",
-    borderColor: "#FF8C00",
-  },
-  filterButtonText: {
-    fontSize: 12,
-    color: "#4B5563",
-    fontWeight: "500",
-  },
-  filterButtonTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  tableScroll: {
-    borderRadius: 8,
-    overflow: "hidden",
-    marginBottom: 16,
+    width: "100%",
   },
   table: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 8,
     overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
   tableHeader: {
-    backgroundColor: "#FF8C00",
+    backgroundColor: "#F97316",
     color: "#FFFFFF",
     fontWeight: "600",
     paddingVertical: 12,
     paddingHorizontal: 8,
+    fontSize: 13,
   },
   tableCell: {
     fontSize: 12,
-    color: "#111827",
+    color: "#374151",
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRightWidth: 1,
@@ -377,18 +409,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   tableRowAlt: {
-    backgroundColor: "#fafafa",
+    backgroundColor: "#F9FAFB",
   },
   actionButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    backgroundColor: "#F0F0F0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F97316",
     borderRadius: 4,
     justifyContent: "center",
     alignItems: "center",
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: 12,
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   paginationContainer: {
     flexDirection: "row",
@@ -398,11 +432,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
   },
   paginationButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: "#FF8C00",
+    backgroundColor: "#F97316",
     borderRadius: 6,
   },
   paginationButtonDisabled: {
@@ -422,10 +457,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+    minHeight: 200,
   },
   errorText: {
-    fontSize: 16,
-    color: "#FF0000",
+    fontSize: 14,
+    color: "#EF4444",
     textAlign: "center",
   },
   loadingText: {

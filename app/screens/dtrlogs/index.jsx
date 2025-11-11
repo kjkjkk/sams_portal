@@ -2,7 +2,7 @@ import DTRLog from "@/components/DTRScreen/DTRLog";
 import BottomNavigation from "@/components/layout/bottom-navigation";
 import Header from "@/components/layout/header";
 import { useAuth } from "@/contexts/AuthContexts";
-import dtrLogStyles from "@/styles/dtrLogStyles";
+import dtrLogStyles from "@/styles/appScreenStyles/dtrLogStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";
 

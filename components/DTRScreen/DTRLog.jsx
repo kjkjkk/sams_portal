@@ -5,6 +5,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,22 +14,34 @@ import {
 
 const DTRLog = () => {
   const params = useLocalSearchParams();
-  const { user } = useAuth(); // Get the authenticated user object
+  const { user } = useAuth();
   const [dtrData, setDtrData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [targetUserInfo, setTargetUserInfo] = useState(null);
 
-  // 1. Construct the Full Name from the local 'user' object
-  const authenticatedUserFullName =
-    user?.usrFirstName && user?.usrLastName
-      ? `${user.usrFirstName} ${user.usrLastName}`
-      : user?.usrUserName || "Employee";
+  // Try to get user ID from params first, fallback to current user
+  const targetUsrId = params.usrId || params.empId || user?.usrID;
 
-  // Determine the user ID to fetch
-  const targetUsrId = params.usrId || user?.usrID;
+  // Calculate pagination
+  const totalPages = Math.ceil(dtrData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = dtrData.slice(startIndex, endIndex);
 
-  // Determine the name to display in headers
-  const headerDisplayName = authenticatedUserFullName;
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   useEffect(() => {
     if (!targetUsrId) {
@@ -40,38 +53,62 @@ const DTRLog = () => {
     const fetchUserDTR = async () => {
       try {
         setLoading(true);
-        console.log("[DTRDetails] Fetching DTR for targetUsrId:", targetUsrId);
+        console.log("[DTRLog] ===== Starting DTR Fetch =====");
+        console.log("[DTRLog] Raw params:", params);
+        console.log("[DTRLog] Target usrId:", targetUsrId);
+        console.log("[DTRLog] Type of targetUsrId:", typeof targetUsrId);
 
-        const userIdToFetch = Number.parseInt(targetUsrId);
+        const userIdToFetch = Number.parseInt(targetUsrId, 10);
+        console.log("[DTRLog] Parsed userIdToFetch:", userIdToFetch);
+
+        if (isNaN(userIdToFetch)) {
+          throw new Error(`Invalid user ID: ${targetUsrId}`);
+        }
 
         // Fetch DTR records
+        console.log("[DTRLog] Calling API with userID:", userIdToFetch);
         const response = await ApiService.getDTRRecords(userIdToFetch);
+        console.log(
+          "[DTRLog] API Response:",
+          JSON.stringify(response, null, 2)
+        );
 
-        if (response.success && response.data) {
+        if (response.success && response.data && response.data.length > 0) {
           const records = response.data;
 
-          // --- 🛑 Step 1: Data Enrichment (Fetching School Names) ---
-          // Collect unique acc_id (school ID) from DTR records
-          const accIDs = [...new Set(records.map((r) => r.acc_id))].filter(
-            (id) => id
-          );
-          const schoolMap = {};
+          // Get target user info from the first record
+          const firstRecord = records[0];
+          const targetUserFullName = firstRecord.emp_name || "Unknown User";
 
-          if (accIDs.length > 0) {
-            // Fetch school names concurrently
-            const schoolPromises = accIDs.map((id) => ApiService.getSchool(id));
-            const schoolsResponses = await Promise.all(schoolPromises);
+          const targetUserAccId = firstRecord.acc_id;
 
-            schoolsResponses.forEach((res) => {
-              if (res.success && res.data) {
-                const school = res.data;
-                // Map the ID (schoolid) to the name (accName or accName2)
-                schoolMap[school.schoolid] =
-                  school.accName2 || school.accName || "Unknown School";
+          console.log("[DTRLog] Target user name:", targetUserFullName);
+          console.log("[DTRLog] Target user accID:", targetUserAccId);
+
+          // Fetch school name using the TARGET user's accID
+          let schoolName = "Unknown School";
+          if (targetUserAccId) {
+            try {
+              const schoolResponse = await ApiService.getSchool(
+                targetUserAccId
+              );
+              console.log("[DTRLog] School API Response:", schoolResponse);
+
+              if (schoolResponse.success && schoolResponse.data) {
+                schoolName = schoolResponse.data.accName || "Unknown School";
+                console.log("[DTRLog] School name:", schoolName);
               }
-            });
+            } catch (schoolError) {
+              console.error("[DTRLog] Error fetching school:", schoolError);
+            }
           }
-          // -----------------------------------------------------------
+
+          // Store target user info
+          setTargetUserInfo({
+            name: targetUserFullName,
+            school: schoolName,
+            accId: targetUserAccId,
+          });
 
           const formatTime = (datetime) => {
             if (!datetime) return "N/A";
@@ -100,24 +137,29 @@ const DTRLog = () => {
           const formattedData = records.map((record) => {
             return {
               id: record.tme_id || "N/A",
-              name: authenticatedUserFullName,
-              // 🛑 Step 2: Use the school map to get the school name
-              school: schoolMap[record.acc_id] || "Unknown School",
+              name: targetUserFullName,
+              school: schoolName,
               timeInAM: formatTime(record.tme_am_in),
               timeOutAM: formatTime(record.tme_am_out),
               timeInPM: formatTime(record.tme_pm_in),
               timeOutPM: formatTime(record.tme_pm_out),
               date: formatDate(record.tme_date),
+              rawAccId: record.acc_id,
             };
           });
 
+          console.log("[DTRLog] Formatted data sample:", formattedData[0]);
+          console.log("[DTRLog] Total records:", formattedData.length);
           setDtrData(formattedData);
           setError(null);
         } else {
-          throw new Error(response.message || "Failed to fetch DTR records");
+          throw new Error(response.message || "No DTR records found");
         }
       } catch (err) {
-        console.error("[DTRDetails] Fetch error:", err);
+        console.error("[DTRLog] ===== ERROR =====");
+        console.error("[DTRLog] Error type:", err.constructor.name);
+        console.error("[DTRLog] Error message:", err.message);
+        console.error("[DTRLog] Error stack:", err.stack);
         setError(`Failed to load DTR data: ${err.message || "Unknown error"}`);
       } finally {
         setLoading(false);
@@ -125,15 +167,13 @@ const DTRLog = () => {
     };
 
     fetchUserDTR();
-  }, [targetUsrId, authenticatedUserFullName]);
+  }, [targetUsrId]);
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#FF8C00" />
-        <Text style={styles.loadingText}>
-          Loading {headerDisplayName} DTR records...
-        </Text>
+        <Text style={styles.loadingText}>Loading DTR records...</Text>
       </View>
     );
   }
@@ -142,6 +182,7 @@ const DTRLog = () => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>⚠️ {error}</Text>
+        <Text style={styles.debugText}>User ID: {targetUsrId}</Text>
       </View>
     );
   }
@@ -149,110 +190,299 @@ const DTRLog = () => {
   if (dtrData.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyText}>
-          No DTR records found for {headerDisplayName}.
-        </Text>
+        <Text style={styles.emptyText}>No DTR records found.</Text>
       </View>
     );
   }
 
-  // --- JSX DISPLAY UPDATED ---
+  const displayName = targetUserInfo?.name || "Employee";
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.headerTitle}>DTR Log for {headerDisplayName}</Text>
+      {/* Cards Section */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.cardsScrollView}
+      >
+        <View style={styles.cardsContainer}>
+          {/* Total Hours Card */}
+          <View style={styles.card}>
+            <View style={styles.cardContent}>
+              <View style={styles.cardLeft}>
+                <Text style={styles.cardTitle}>Total Hours</Text>
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
+                    />
+                    <Text style={styles.legendText}>
+                      Total Hours: <Text style={styles.legendValue}>160</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[styles.legendDot, { backgroundColor: "#F97316" }]}
+                    />
+                    <Text style={styles.legendText}>
+                      Overtime: <Text style={styles.legendValue}>8</Text>
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.cardDivider} />
+                <Text style={styles.monthText}>
+                  Total Hours of the Month:{" "}
+                  <Text style={styles.monthValue}>322</Text>
+                </Text>
+              </View>
+              <View style={styles.chartPlaceholder}>
+                <View style={styles.chartInner} />
+              </View>
+            </View>
+          </View>
+
+          {/* Attendance Summary Card */}
+          <View style={styles.card}>
+            <View style={styles.cardContent}>
+              <View style={styles.cardLeft}>
+                <Text style={styles.cardTitle}>Attendance Summary</Text>
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[styles.legendDot, { backgroundColor: "#22C55E" }]}
+                    />
+                    <Text style={styles.legendText}>
+                      Days Present: <Text style={styles.legendValue}>18</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
+                    />
+                    <Text style={styles.legendText}>
+                      Days Absent: <Text style={styles.legendValue}>2</Text>
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.chartPlaceholder,
+                  { backgroundColor: "#22C55E" },
+                ]}
+              >
+                <View style={styles.chartInner} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Table Section */}
+      <Text style={styles.headerTitle}>DTR Log for {displayName}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.tableScroll}
       >
         <View style={styles.table}>
-          {/* Table Header - School column ADDED BACK */}
+          {/* Table Header */}
           <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, styles.tableHeader, { width: 50 }]}>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
               ID
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 150 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 200 }]}
             >
               Name
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 130 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 170 }]}
             >
               School
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 140 }]}
             >
               Time In (AM)
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 110 }]}
-            >
-              Time Out (AM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
-            >
-              Time In (PM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 110 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 140 }]}
             >
               Time Out (PM)
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
             >
               Date
             </Text>
           </View>
 
-          {/* Table Rows - School cell ADDED BACK */}
-          {dtrData.map((item, index) => (
+          {/* Table Rows */}
+          {currentData.map((item, index) => (
             <View
-              // 🛑 Alternative Fix: Use the index if the DB ID is causing issues,
-              // but only if the list items won't be reordered, filtered, or deleted.
               key={index}
               style={[styles.tableRow, index % 2 !== 0 && styles.tableRowAlt]}
             >
-              <Text style={[styles.tableCell, { width: 50 }]}>{item.id}</Text>
-              <Text style={[styles.tableCell, { width: 150 }]}>
+              <Text style={[styles.tableCell, { width: 80 }]}>{item.id}</Text>
+              <Text style={[styles.tableCell, { width: 200 }]}>
                 {item.name}
               </Text>
-              {/* 🛑 ADDED: School Data Cell */}
-              <Text style={[styles.tableCell, { width: 130 }]}>
+              <Text style={[styles.tableCell, { width: 170 }]}>
                 {item.school}
               </Text>
-              <Text style={[styles.tableCell, { width: 100 }]}>
+              <Text style={[styles.tableCell, { width: 140 }]}>
                 {item.timeInAM}
               </Text>
-              <Text style={[styles.tableCell, { width: 110 }]}>
-                {item.timeOutAM}
-              </Text>
-              <Text style={[styles.tableCell, { width: 100 }]}>
-                {item.timeInPM}
-              </Text>
-              <Text style={[styles.tableCell, { width: 110 }]}>
+              <Text style={[styles.tableCell, { width: 140 }]}>
                 {item.timeOutPM}
               </Text>
-              <Text style={[styles.tableCell, { width: 100 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>
                 {item.date}
               </Text>
             </View>
           ))}
         </View>
       </ScrollView>
+
+      {/* Pagination Controls */}
+      <View style={styles.paginationContainer}>
+        <Pressable
+          style={[
+            styles.paginationButton,
+            currentPage === 1 && styles.paginationButtonDisabled,
+          ]}
+          onPress={handlePreviousPage}
+          disabled={currentPage === 1}
+        >
+          <Text style={styles.paginationButtonText}>Previous</Text>
+        </Pressable>
+        <Text style={styles.pageInfo}>
+          Page {currentPage} of {totalPages || 1}
+        </Text>
+        <Pressable
+          style={[
+            styles.paginationButton,
+            currentPage === totalPages && styles.paginationButtonDisabled,
+          ]}
+          onPress={handleNextPage}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={styles.paginationButtonText}>Next</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  // Note: minWidth for the table has been adjusted to accommodate the new column.
   container: {
     flex: 1,
     backgroundColor: "#fafafaff",
     padding: 16,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#666",
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#EF4444",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  debugText: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#999",
+  },
+  cardsScrollView: {
+    marginBottom: 24,
+  },
+  cardsContainer: {
+    flexDirection: "row",
+    gap: 16,
+    paddingRight: 16,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    padding: 16,
+    minWidth: 300,
+  },
+  cardContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  cardLeft: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginBottom: 16,
+  },
+  legendContainer: {
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    color: "#374151",
+  },
+  legendValue: {
+    fontWeight: "600",
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: 16,
+  },
+  monthText: {
+    fontSize: 12,
+    color: "#4B5563",
+  },
+  monthValue: {
+    fontWeight: "700",
+    color: "#111827",
+  },
+  chartPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chartInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#FFFFFF",
   },
   headerTitle: {
     fontSize: 18,
@@ -261,37 +491,13 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   tableScroll: {
-    borderRadius: 8,
-    overflow: "hidden",
-    marginTop: 5,
-    elevation: 2, // Shadow for Android
-    shadowColor: "#000", // Shadow for iOS
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    marginBottom: 24,
   },
   table: {
+    borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 8,
     overflow: "hidden",
-    minWidth: 850, // Adjusted for the extra 'School' column
-  },
-  tableHeader: {
-    backgroundColor: "#FF8C00",
-    color: "#FFFFFF",
-    fontWeight: "600",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    textAlign: "center",
-  },
-  tableCell: {
-    fontSize: 12,
-    color: "#111827",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRightWidth: 1,
-    borderRightColor: "#E5E7EB",
-    textAlign: "center",
   },
   tableRow: {
     flexDirection: "row",
@@ -300,27 +506,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   tableRowAlt: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F9FAFB",
   },
-  centerContainer: {
-    flex: 1,
+  tableCell: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    fontSize: 12,
+    color: "#374151",
+    borderRightWidth: 1,
+    borderRightColor: "#E5E7EB",
+  },
+  tableHeader: {
+    backgroundColor: "#FF8C00",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  paginationContainer: {
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    gap: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
-  errorText: {
-    fontSize: 16,
-    color: "#FF0000",
-    textAlign: "center",
+  paginationButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#FF8C00",
+    borderRadius: 6,
   },
-  loadingText: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 8,
+  paginationButtonDisabled: {
+    backgroundColor: "#D1D5DB",
   },
-  emptyText: {
-    fontSize: 14,
-    color: "#999",
+  paginationButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  pageInfo: {
+    fontSize: 12,
+    color: "#4B5563",
+    fontWeight: "500",
   },
 });
 

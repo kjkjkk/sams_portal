@@ -2,7 +2,7 @@ import ElectionProcessResult from "@/components/election-process-result";
 import BottomNavigation from "@/components/layout/bottom-navigation";
 import Header from "@/components/layout/header";
 import StatisticsCards from "@/components/statistics-cards";
-import homeStyles from "@/styles/homeStyles";
+import homeStyles from "@/styles/appScreenStyles/homeStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";

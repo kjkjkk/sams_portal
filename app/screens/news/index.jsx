@@ -3,7 +3,7 @@
 import BottomNavigation from "@/components/layout/bottom-navigation";
 import Header from "@/components/layout/header";
 import NewsItem from "@/components/NewsScreen/NewsItem";
-import newStyles from "@/styles/newsStyles";
+import newStyles from "@/styles/appScreenStyles/newsStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useState } from "react";

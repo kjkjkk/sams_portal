@@ -7,6 +7,10 @@ const dtrStyles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom: 24, // Gap at the bottom
+  },
+  scrollViewContent: {
+    paddingBottom: 24, // Gap at the bottom
   },
   header: {
     flexDirection: "row",
@@ -134,7 +138,7 @@ const dtrStyles = StyleSheet.create({
   },
   tableContainer: {
     marginHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 0, // Removed because paddingBottom is in scrollViewContent
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,

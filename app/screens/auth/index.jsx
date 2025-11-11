@@ -1,6 +1,6 @@
 import Logo1 from "@/assets/images/Logo1.png";
 import { useAuth } from "@/contexts/AuthContexts";
-import loginStyles from "@/styles/loginStyles";
+import loginStyles from "@/styles/appScreenStyles/loginStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";

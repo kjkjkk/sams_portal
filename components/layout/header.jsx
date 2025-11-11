@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContexts";
 import ApiService from "@/services/api";
+// import headerStyles from "@/styles/layoutStyles/header";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
@@ -48,7 +49,7 @@ const Header = () => {
 
   const getSchoolDisplayName = () => {
     if (loading) return "...";
-    return schoolData?.accName2 || schoolData?.accName || "INFINITTTT";
+    return schoolData?.accName2 || schoolData?.accName || "INFINIT";
   };
 
   const renderSchoolLogo = () => {
@@ -56,7 +57,7 @@ const Header = () => {
 
     if (displayName.toUpperCase() === "UM") {
       return (
-        <Text style={styles.logoText}>
+        <Text style={headerStyles.logoText}>
           <Text style={{ color: "#D00000" }}>U</Text>
           <Text style={{ color: "#FFD000" }}>M </Text>
           LMS
@@ -65,7 +66,7 @@ const Header = () => {
     }
     if (displayName.toUpperCase() === "INFINIT") {
       return (
-        <Text style={styles.logoText}>
+        <Text style={headerStyles.logoText}>
           <Text style={{ color: "#171717ff" }}>INFIN</Text>
           <Text style={{ color: "#ff8400ff" }}>IT </Text>
           LMS
@@ -74,35 +75,35 @@ const Header = () => {
     }
 
     return (
-      <Text style={[styles.logoText, { color: "#000" }]}>
+      <Text style={[headerStyles.logoText, { color: "#000" }]}>
         {displayName} LMS
       </Text>
     );
   };
 
   return (
-    <View style={styles.header}>
-      <View style={styles.headerContent}>
-        <Text style={styles.welcomeText}>
+    <View style={headerStyles.header}>
+      <View style={headerStyles.headerContent}>
+        <Text style={headerStyles.welcomeText}>
           Welcome to {getSchoolDisplayName()} LMS
         </Text>
-        <View style={styles.userSection}>
+        <View style={headerStyles.userSection}>
           {/* <Image
             source={
               user?.usrImage
                 ? { uri: user.usrImage }
                 : require("@/assets/images/Imageicn.png")
             }
-            style={styles.userAvatar}
+            style={headerStyles.userAvatar}
           /> */}
           <Image
             source={require("@/assets/images/Imageicn.png")}
-            style={styles.userAvatar}
+            style={headerStyles.userAvatar}
           />
-          <Text style={styles.userName}>{fullName}</Text>
+          <Text style={headerStyles.userName}>{fullName}</Text>
         </View>
       </View>
-      <View style={styles.logoSection}>
+      <View style={headerStyles.logoSection}>
         <Ionicons name="bulb" size={48} color="#FF9500" />
         {renderSchoolLogo()}
       </View>
@@ -110,7 +111,7 @@ const Header = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const headerStyles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

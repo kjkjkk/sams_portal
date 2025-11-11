@@ -1,7 +1,7 @@
 import DTRTable from "@/components/DTRScreen/DTRTable";
 import BottomNavigation from "@/components/layout/bottom-navigation";
 import Header from "@/components/layout/header";
-import dtrStyles from "@/styles/dtrStyles";
+import dtrStyles from "@/styles/appScreenStyles/dtrStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useState } from "react";
@@ -19,22 +19,24 @@ const DTRScreen = () => {
   const navigation = useNavigation();
 
   const [searchText, setSearchText] = useState("");
-  const [selectedUserType, setSelectedUserType] = useState("all");
+  const [selectedUserType, setSelectedUserType] = useState(null); // null means "All"
 
+  // User types based on your database usertypes table
   const userTypes = [
-    "All",
-    "Admin",
-    "Student",
-    "Faculty",
-    "Employee",
-    "Program Head",
-    "SA",
+    { id: null, label: "All" },
+    { id: 2, label: "Admin" },
+    { id: 4, label: "Student" },
+    { id: 3, label: "Faculty" },
+    { id: 5, label: "Employee" },
+    { id: 6, label: "Program Head" },
+    { id: 7, label: "SA" },
   ];
 
   return (
     <SafeAreaView style={dtrStyles.container}>
       <ScrollView
         style={dtrStyles.scrollView}
+        contentContainerStyle={dtrStyles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Header Section */}
@@ -54,14 +56,15 @@ const DTRScreen = () => {
             <View style={dtrStyles.filterButtonsContainer}>
               {userTypes.map((type) => (
                 <TouchableOpacity
-                  key={type}
+                  key={type.id ?? "all"}
                   style={[
                     dtrStyles.filterButton,
-                    selectedUserType === type && dtrStyles.filterButtonActive,
+                    selectedUserType === type.id &&
+                      dtrStyles.filterButtonActive,
                   ]}
-                  onPress={() => setSelectedUserType(type)}
+                  onPress={() => setSelectedUserType(type.id)}
                 >
-                  {selectedUserType === type && (
+                  {selectedUserType === type.id && (
                     <Ionicons
                       name="chevron-forward"
                       size={16}
@@ -71,11 +74,11 @@ const DTRScreen = () => {
                   <Text
                     style={[
                       dtrStyles.filterButtonText,
-                      selectedUserType === type &&
+                      selectedUserType === type.id &&
                         dtrStyles.filterButtonTextActive,
                     ]}
                   >
-                    {type}
+                    {type.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -99,13 +102,13 @@ const DTRScreen = () => {
 
         {/* Data Table */}
         <View style={dtrStyles.tableContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            {/* Pass filters directly to DTRTable */}
-            <DTRTable
-              selectedUserType={selectedUserType}
-              searchText={searchText}
-            />
-          </ScrollView>
+          {/* <ScrollView horizontal showsHorizontalScrollIndicator={true}> */}
+          {/* Pass filters to DTRTable - filtering happens inside DTRTable */}
+          <DTRTable
+            selectedUserType={selectedUserType}
+            searchText={searchText}
+          />
+          {/* </ScrollView> */}
         </View>
       </ScrollView>
       <BottomNavigation />
