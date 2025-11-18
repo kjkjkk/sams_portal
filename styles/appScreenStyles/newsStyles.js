@@ -6,6 +6,10 @@ const newStyles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom: 30, // Gap at the bottom
+  },
+  scrollViewContent: {
+    paddingBottom: 30, // Gap at the bottom
   },
   backButton: {
     paddingHorizontal: 16,

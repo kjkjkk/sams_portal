@@ -68,7 +68,7 @@ const DTRScreen = () => {
                     <Ionicons
                       name="chevron-forward"
                       size={16}
-                      color="#17A2B8"
+                      color="#F97316"
                     />
                   )}
                   <Text

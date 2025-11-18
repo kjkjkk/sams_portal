@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { PieChart } from "react-native-chart-kit";
 
 const DTRLog = () => {
   const params = useLocalSearchParams();
@@ -22,10 +23,131 @@ const DTRLog = () => {
   const [itemsPerPage] = useState(10);
   const [targetUserInfo, setTargetUserInfo] = useState(null);
 
-  // Try to get user ID from params first, fallback to current user
   const targetUsrId = params.usrId || params.empId || user?.usrID;
 
-  // Calculate pagination
+  const parseTime = (timeStr) => {
+    if (!timeStr || timeStr === "N/A") return null;
+    try {
+      const [hours, minutes, seconds] = timeStr.split(":");
+      const totalMinutes =
+        Number.parseInt(hours) * 60 +
+        Number.parseInt(minutes) +
+        Number.parseInt(seconds || 0) / 60;
+      return totalMinutes;
+    } catch {
+      return null;
+    }
+  };
+
+  const calculateHours = (filterByMonth = false) => {
+    if (!dtrData || dtrData.length === 0) {
+      return {
+        totalHours: "0",
+        overtimeHours: "0",
+        regularHours: "0",
+        daysWorked: 0,
+      };
+    }
+
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    let totalMinutes = 0;
+    let overtimeMinutes = 0;
+    let daysCount = 0;
+    const REGULAR_HOURS_PER_DAY = 8;
+    const REGULAR_MINUTES_PER_DAY = REGULAR_HOURS_PER_DAY * 60;
+
+    dtrData.forEach((record) => {
+      if (filterByMonth && record.date && record.date !== "N/A") {
+        try {
+          const recordDate = new Date(record.date);
+          const recordMonth = recordDate.getMonth();
+          const recordYear = recordDate.getFullYear();
+
+          if (recordMonth !== currentMonth || recordYear !== currentYear) {
+            return;
+          }
+        } catch (e) {
+          console.error("[DTRLog] Error parsing date:", record.date);
+          return;
+        }
+      }
+
+      let dayMinutes = 0;
+
+      const hasAmIn = record.timeInAM && record.timeInAM !== "N/A";
+      const hasAmOut = record.timeOutAM && record.timeOutAM !== "N/A";
+      const hasPmIn = record.timeInPM && record.timeInPM !== "N/A";
+      const hasPmOut = record.timeOutPM && record.timeOutPM !== "N/A";
+
+      if (hasAmIn && hasPmOut) {
+        const dayInMinutes = parseTime(record.timeInAM);
+        const dayOutMinutes = parseTime(record.timeOutPM);
+
+        if (dayInMinutes !== null && dayOutMinutes !== null) {
+          let duration = dayOutMinutes - dayInMinutes;
+          if (duration < 0) {
+            duration += 24 * 60;
+          }
+          dayMinutes = duration;
+        }
+      } else {
+        if (hasAmIn && hasAmOut) {
+          const amInMinutes = parseTime(record.timeInAM);
+          const amOutMinutes = parseTime(record.timeOutAM);
+
+          if (amInMinutes !== null && amOutMinutes !== null) {
+            let amDuration = amOutMinutes - amInMinutes;
+            if (amDuration < 0) {
+              amDuration += 24 * 60;
+            }
+            dayMinutes += amDuration;
+          }
+        }
+
+        if (hasPmIn && hasPmOut) {
+          const pmInMinutes = parseTime(record.timeInPM);
+          const pmOutMinutes = parseTime(record.timeOutPM);
+
+          if (pmInMinutes !== null && pmOutMinutes !== null) {
+            let pmDuration = pmOutMinutes - pmInMinutes;
+            if (pmDuration < 0) {
+              pmDuration += 24 * 60;
+            }
+            dayMinutes += pmDuration;
+          }
+        }
+      }
+
+      totalMinutes += dayMinutes;
+
+      if (dayMinutes > 0) {
+        daysCount++;
+      }
+
+      if (dayMinutes > REGULAR_MINUTES_PER_DAY) {
+        overtimeMinutes += dayMinutes - REGULAR_MINUTES_PER_DAY;
+      }
+    });
+
+    const totalHours = Math.round(totalMinutes / 60).toString();
+    const overtimeHours = Math.round(overtimeMinutes / 60).toString();
+    const regularMinutes = totalMinutes - overtimeMinutes;
+    const regularHours = Math.round(regularMinutes / 60).toString();
+
+    return {
+      totalHours,
+      overtimeHours,
+      regularHours,
+      daysWorked: filterByMonth ? daysCount : dtrData.length,
+    };
+  };
+
+  const allTimeStats = calculateHours(false);
+  const { totalHours, overtimeHours, regularHours } = allTimeStats;
+
   const totalPages = Math.ceil(dtrData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -53,57 +175,34 @@ const DTRLog = () => {
     const fetchUserDTR = async () => {
       try {
         setLoading(true);
-        console.log("[DTRLog] ===== Starting DTR Fetch =====");
-        console.log("[DTRLog] Raw params:", params);
-        console.log("[DTRLog] Target usrId:", targetUsrId);
-        console.log("[DTRLog] Type of targetUsrId:", typeof targetUsrId);
-
         const userIdToFetch = Number.parseInt(targetUsrId, 10);
-        console.log("[DTRLog] Parsed userIdToFetch:", userIdToFetch);
 
         if (isNaN(userIdToFetch)) {
           throw new Error(`Invalid user ID: ${targetUsrId}`);
         }
 
-        // Fetch DTR records
-        console.log("[DTRLog] Calling API with userID:", userIdToFetch);
         const response = await ApiService.getDTRRecords(userIdToFetch);
-        console.log(
-          "[DTRLog] API Response:",
-          JSON.stringify(response, null, 2)
-        );
 
         if (response.success && response.data && response.data.length > 0) {
           const records = response.data;
-
-          // Get target user info from the first record
           const firstRecord = records[0];
           const targetUserFullName = firstRecord.emp_name || "Unknown User";
-
           const targetUserAccId = firstRecord.acc_id;
 
-          console.log("[DTRLog] Target user name:", targetUserFullName);
-          console.log("[DTRLog] Target user accID:", targetUserAccId);
-
-          // Fetch school name using the TARGET user's accID
           let schoolName = "Unknown School";
           if (targetUserAccId) {
             try {
               const schoolResponse = await ApiService.getSchool(
                 targetUserAccId
               );
-              console.log("[DTRLog] School API Response:", schoolResponse);
-
               if (schoolResponse.success && schoolResponse.data) {
                 schoolName = schoolResponse.data.accName || "Unknown School";
-                console.log("[DTRLog] School name:", schoolName);
               }
             } catch (schoolError) {
               console.error("[DTRLog] Error fetching school:", schoolError);
             }
           }
 
-          // Store target user info
           setTargetUserInfo({
             name: targetUserFullName,
             school: schoolName,
@@ -148,18 +247,13 @@ const DTRLog = () => {
             };
           });
 
-          console.log("[DTRLog] Formatted data sample:", formattedData[0]);
-          console.log("[DTRLog] Total records:", formattedData.length);
           setDtrData(formattedData);
           setError(null);
         } else {
           throw new Error(response.message || "No DTR records found");
         }
       } catch (err) {
-        console.error("[DTRLog] ===== ERROR =====");
-        console.error("[DTRLog] Error type:", err.constructor.name);
-        console.error("[DTRLog] Error message:", err.message);
-        console.error("[DTRLog] Error stack:", err.stack);
+        console.error("[DTRLog] Error:", err);
         setError(`Failed to load DTR data: ${err.message || "Unknown error"}`);
       } finally {
         setLoading(false);
@@ -187,6 +281,8 @@ const DTRLog = () => {
     );
   }
 
+  const displayName = targetUserInfo?.name || "Employee";
+
   if (dtrData.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -195,98 +291,141 @@ const DTRLog = () => {
     );
   }
 
-  const displayName = targetUserInfo?.name || "Employee";
+  // Donut chart component
+  const DonutChart = ({ regular, overtime }) => {
+    const regHours = Number.parseFloat(regular);
+    const overtimeHrs = Number.parseFloat(overtime);
+    const total = regHours + overtimeHrs;
+
+    if (total === 0) {
+      return (
+        <View style={styles.chartContainer}>
+          <Text style={styles.noDataText}>No data</Text>
+        </View>
+      );
+    }
+
+    const data = [
+      {
+        name: "Regular Hours",
+        hours: regHours,
+        color: "#EF4444",
+        legendFontColor: "#1F2937",
+        legendFontSize: 14,
+      },
+      {
+        name: "Overtime",
+        hours: overtimeHrs,
+        color: "#FF8C00",
+        legendFontColor: "#1F2937",
+        legendFontSize: 14,
+      },
+      {
+        name: "Total Break",
+        hours: 0.1,
+        color: "#FFEB3B",
+        legendFontColor: "#1F2937",
+        legendFontSize: 14,
+      },
+    ];
+
+    return (
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        <PieChart
+          data={data}
+          width={90}
+          height={90}
+          paddingLeft="20"
+          chartConfig={{
+            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+          }}
+          accessor="hours"
+          backgroundColor="transparent"
+          hasLegend={false}
+        />
+        <View
+          style={{
+            position: "absolute",
+            width: 50,
+            height: 50,
+            borderRadius: 35,
+            // paddingLeft: 20,
+            marginLeft: -5,
+            backgroundColor: "white", // or match your screen background
+          }}
+        />
+      </View>
+    );
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Cards Section */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.cardsScrollView}
-      >
-        <View style={styles.cardsContainer}>
-          {/* Total Hours Card */}
-          <View style={styles.card}>
-            <View style={styles.cardContent}>
-              <View style={styles.cardLeft}>
-                <Text style={styles.cardTitle}>Total Hours</Text>
-                <View style={styles.legendContainer}>
-                  <View style={styles.legendItem}>
-                    <View
-                      style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
-                    />
-                    <Text style={styles.legendText}>
-                      Total Hours: <Text style={styles.legendValue}>160</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View
-                      style={[styles.legendDot, { backgroundColor: "#F97316" }]}
-                    />
-                    <Text style={styles.legendText}>
-                      Overtime: <Text style={styles.legendValue}>8</Text>
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.cardDivider} />
-                <Text style={styles.monthText}>
-                  Total Hours of the Month:{" "}
-                  <Text style={styles.monthValue}>322</Text>
+      {/* Header */}
+      <View style={{ marginBottom: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ color: "#FF7700", fontSize: 18 }}>▶</Text>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: "#1f2937",
+              marginLeft: 8,
+              fontWeight: "600",
+            }}
+          >
+            {displayName}'s Log
+          </Text>
+        </View>
+      </View>
+
+      {/* Card Section */}
+      <View style={styles.card}>
+        <View style={styles.cardContent}>
+          {/* Left side - Legend */}
+          <View style={styles.legendContainer}>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
+              />
+              <View>
+                {/* <Text style={styles.legendNumber}></Text> */}
+                <Text style={styles.legendLabel}>
+                  {regularHours} Regular Hour
                 </Text>
               </View>
-              <View style={styles.chartPlaceholder}>
-                <View style={styles.chartInner} />
+            </View>
+
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendDot, { backgroundColor: "#FF8C00" }]}
+              />
+              <View>
+                {/* <Text style={styles.legendNumber}></Text> */}
+                <Text style={styles.legendLabel}>{overtimeHours} Overtime</Text>
               </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.totalSection}>
+              <Text style={styles.totalLabel}>
+                Total Hours of the Month: {totalHours}
+              </Text>
             </View>
           </View>
 
-          {/* Attendance Summary Card */}
-          <View style={styles.card}>
-            <View style={styles.cardContent}>
-              <View style={styles.cardLeft}>
-                <Text style={styles.cardTitle}>Attendance Summary</Text>
-                <View style={styles.legendContainer}>
-                  <View style={styles.legendItem}>
-                    <View
-                      style={[styles.legendDot, { backgroundColor: "#22C55E" }]}
-                    />
-                    <Text style={styles.legendText}>
-                      Days Present: <Text style={styles.legendValue}>18</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View
-                      style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
-                    />
-                    <Text style={styles.legendText}>
-                      Days Absent: <Text style={styles.legendValue}>2</Text>
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.chartPlaceholder,
-                  { backgroundColor: "#22C55E" },
-                ]}
-              >
-                <View style={styles.chartInner} />
-              </View>
-            </View>
-          </View>
+          {/* Right side - Chart */}
+          <DonutChart regular={regularHours} overtime={overtimeHours} />
         </View>
-      </ScrollView>
+      </View>
 
       {/* Table Section */}
-      <Text style={styles.headerTitle}>DTR Log for {displayName}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.tableScroll}
       >
         <View style={styles.table}>
-          {/* Table Header */}
           <View style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
               ID
@@ -318,7 +457,6 @@ const DTRLog = () => {
             </Text>
           </View>
 
-          {/* Table Rows */}
           {currentData.map((item, index) => (
             <View
               key={index}
@@ -345,7 +483,7 @@ const DTRLog = () => {
         </View>
       </ScrollView>
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       <View style={styles.paginationContainer}>
         <Pressable
           style={[
@@ -378,7 +516,7 @@ const DTRLog = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fafafaff",
+    backgroundColor: "#FAFAFA",
     padding: 16,
   },
   centerContainer: {
@@ -407,88 +545,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
   },
-  cardsScrollView: {
-    marginBottom: 24,
-  },
-  cardsContainer: {
-    flexDirection: "row",
-    gap: 16,
-    paddingRight: 16,
-  },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    padding: 16,
-    minWidth: 300,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  cardLeft: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4B5563",
-    marginBottom: 16,
-  },
   legendContainer: {
-    gap: 12,
+    flex: 0,
+    minWidth: 180,
+    paddingRight: 20,
+    justifyContent: "center",
   },
   legendItem: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    alignItems: "flex-start",
+    marginBottom: 10,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 2,
+    marginRight: 8,
+    marginTop: 2,
   },
-  legendText: {
-    fontSize: 12,
-    color: "#374151",
-  },
-  legendValue: {
+  legendNumber: {
+    fontSize: 14,
+    color: "#1F2937",
     fontWeight: "600",
   },
-  cardDivider: {
+  legendLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    lineHeight: 14,
+  },
+  divider: {
     height: 1,
     backgroundColor: "#E5E7EB",
-    marginVertical: 16,
+    marginVertical: 12,
   },
-  monthText: {
-    fontSize: 12,
-    color: "#4B5563",
+  totalSection: {
+    marginTop: 4,
   },
-  monthValue: {
+  totalLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    fontWeight: "400",
+    marginBottom: 6,
+    lineHeight: 14,
+  },
+  totalValue: {
+    fontSize: 28,
+    color: "#3B82F6",
     fontWeight: "700",
-    color: "#111827",
   },
-  chartPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#EF4444",
-    justifyContent: "center",
+  chartContainer: {
+    justifyContent: "flex-start",
     alignItems: "center",
   },
-  chartInner: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#FFFFFF",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#333",
+  noDataText: {
+    fontSize: 14,
+    color: "#999",
   },
   tableScroll: {
     marginBottom: 24,

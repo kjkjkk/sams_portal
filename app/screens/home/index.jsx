@@ -85,43 +85,39 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={homeStyles.container}>
+      <Header />
       <ScrollView
         style={homeStyles.scrollView}
+        contentContainerStyle={homeStyles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={homeStyles.container}>
-          <Header />
-          <ScrollView
-            style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Ionicons name="home-sharp" size={24} color="#333" />
-              <Text style={{ fontSize: 20, fontWeight: "bold", marginLeft: 8 }}>
-                Home
-              </Text>
-              <View
-                style={{
-                  flex: 1,
-                  height: 1,
-                  backgroundColor: "#ccc",
-                  marginLeft: 16,
-                }}
-              />
-            </View>
-          </ScrollView>
+        {/* Home Header Section */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 24,
+            paddingVertical: 16,
+          }}
+        >
+          <Ionicons name="home-sharp" size={24} color="#333" />
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginLeft: 8 }}>
+            Home
+          </Text>
+          <View
+            style={{
+              flex: 1,
+              height: 1,
+              backgroundColor: "#ccc",
+              marginLeft: 16,
+            }}
+          />
+        </View>
 
-          <ScrollView
-            style={homeStyles.content}
-            showsVerticalScrollIndicator={false}
-          >
-            <StatisticsCards cards={memberStatsCards} />
-            <ElectionProcessResult cards={electionCards} />
-          </ScrollView>
+        {/* Main Content */}
+        <View style={homeStyles.content}>
+          <StatisticsCards cards={memberStatsCards} />
+          <ElectionProcessResult cards={electionCards} />
         </View>
       </ScrollView>
       <BottomNavigation />

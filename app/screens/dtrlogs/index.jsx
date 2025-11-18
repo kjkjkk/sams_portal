@@ -29,7 +29,7 @@ const dtrLogs = () => {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  marginBottom: 24,
+                  // marginBottom: 18,
                 }}
               >
                 <Ionicons name="time-sharp" size={24} color="#333" />
@@ -46,23 +46,6 @@ const dtrLogs = () => {
                     marginLeft: 16,
                   }}
                 />
-              </View>
-
-              {/* My DTR Entry Log */}
-              <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ color: "#FF7700", fontSize: 18 }}>▶</Text>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: "600",
-                      color: "#1f2937",
-                      marginLeft: 8,
-                    }}
-                  >
-                    {fullName}'s Log
-                  </Text>
-                </View>
               </View>
 
               {/* Table */}

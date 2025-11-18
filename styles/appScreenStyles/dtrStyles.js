@@ -101,7 +101,7 @@ const dtrStyles = StyleSheet.create({
     gap: 4,
   },
   filterButtonActive: {
-    borderBottomColor: "#17A2B8",
+    borderBottomColor: "#F97316",
   },
   filterButtonText: {
     fontSize: 13,
@@ -109,7 +109,7 @@ const dtrStyles = StyleSheet.create({
     color: "#666",
   },
   filterButtonTextActive: {
-    color: "#17A2B8",
+    color: "#F97316",
   },
   searchContainer: {
     flexDirection: "row",
@@ -129,7 +129,7 @@ const dtrStyles = StyleSheet.create({
     color: "#333",
   },
   searchButton: {
-    backgroundColor: "#17A2B8",
+    backgroundColor: "#F97316",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 6,

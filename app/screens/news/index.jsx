@@ -202,6 +202,7 @@ const NewsScreen = () => {
     <SafeAreaView style={newStyles.container}>
       <ScrollView
         style={newStyles.scrollView}
+        contentContainerStyle={newStyles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Header Section */}

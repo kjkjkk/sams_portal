@@ -42,7 +42,7 @@ const BottomNavigation = () => {
           style={bottomNavStyles.navItem}
           onPress={() => router.push("/screens/news")}
         >
-          <Ionicons name="list" size={24} color="#fff" />
+          <Ionicons name="folder" size={24} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -53,9 +53,9 @@ const BottomNavigation = () => {
           <Ionicons name="time" size={24} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={bottomNavStyles.navItem}>
+        {/* <TouchableOpacity style={bottomNavStyles.navItem}>
           <Ionicons name="folder" size={24} color="#fff" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <TouchableOpacity
           style={bottomNavStyles.navItem}

@@ -5,6 +5,13 @@ const homeStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  scrollView: {
+    flex: 1,
+    paddingBottom: 30, // Gap at the bottom
+  },
+  scrollViewContent: {
+    paddingBottom: 30, // Gap at the bottom
+  },
   content: {
     flex: 1,
     paddingHorizontal: 16,
