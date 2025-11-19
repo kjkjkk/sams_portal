@@ -1,13 +1,15 @@
 import { useAuth } from "@/contexts/AuthContexts";
+import { useTheme } from "@/contexts/ThemeContext"; // Add this line
 import ApiService from "@/services/api";
 // import headerStyles from "@/styles/layoutStyles/header";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 const Header = () => {
   const { user, getUserFullName } = useAuth();
   const [schoolData, setSchoolData] = useState(null);
+  const { theme } = useTheme(); // Add this line
   const [loading, setLoading] = useState(false);
 
   const fullName = getUserFullName();
@@ -80,6 +82,59 @@ const Header = () => {
       </Text>
     );
   };
+
+  // Create dynamic styles based on theme - Add this section
+  const headerStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          backgroundColor: theme.content, // Dynamic
+          alignItems: "flex-start",
+          paddingHorizontal: 16,
+          paddingVertical: 20,
+          borderBottomWidth: 1,
+          borderBottomColor: "#f0f0f0",
+        },
+        headerContent: {
+          flex: 1,
+        },
+        welcomeText: {
+          fontSize: 20,
+          fontWeight: "700",
+          color: theme.contentText, // Dynamic
+          marginBottom: 12,
+          letterSpacing: -0.5,
+        },
+        userSection: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        },
+        userAvatar: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+        },
+        userName: {
+          fontSize: 15,
+          fontWeight: "600",
+          color: theme.contentText, // Dynamic
+        },
+        logoSection: {
+          alignItems: "center",
+          gap: 2,
+        },
+        logoText: {
+          fontSize: 11,
+          fontWeight: "700",
+          color: "#666",
+          letterSpacing: 0.5,
+        },
+      }),
+    [theme]
+  );
 
   return (
     <View style={headerStyles.header}>

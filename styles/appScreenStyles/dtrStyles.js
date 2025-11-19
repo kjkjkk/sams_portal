@@ -111,6 +111,45 @@ const dtrStyles = StyleSheet.create({
   filterButtonTextActive: {
     color: "#F97316",
   },
+  dropdownWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  dropdown: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: "#999",
+    fontWeight: "500",
+  },
+  dropdownMenu: {
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
   searchContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,

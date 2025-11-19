@@ -3,22 +3,25 @@
 // File: app/_layout.js (or app/_layout.tsx)
 // ============================================
 import { AuthProvider } from "@/contexts/AuthContexts";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Stack } from "expo-router";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: "none",
-        }}
-      >
-        <Stack.Screen name="index" /> {/* Login screen */}
-        <Stack.Screen name="home" />
-        <Stack.Screen name="(tabs)" />
-        {/* Add all your other screens */}
-      </Stack>
+      <ThemeProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "none",
+          }}
+        >
+          <Stack.Screen name="index" /> {/* Login screen */}
+          <Stack.Screen name="home" />
+          <Stack.Screen name="(tabs)" />
+          {/* Add all your other screens */}
+        </Stack>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

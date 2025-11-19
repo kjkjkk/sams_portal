@@ -1,10 +1,13 @@
 "use client";
 import { useAuth } from "@/contexts/AuthContexts";
+import { useTheme } from "@/contexts/ThemeContext"; // Add this import
 import ApiService from "@/services/api";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { PieChart } from "react-native-chart-kit";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const DTRLog = () => {
   const params = useLocalSearchParams();
@@ -23,7 +27,69 @@ const DTRLog = () => {
   const [itemsPerPage] = useState(10);
   const [targetUserInfo, setTargetUserInfo] = useState(null);
 
+  // Date picker states - Updated for modal datetime picker
+  const [filterFromDate, setFilterFromDate] = useState(null);
+  const [filterToDate, setFilterToDate] = useState(null);
+  const [appliedFromDate, setAppliedFromDate] = useState(null);
+  const [appliedToDate, setAppliedToDate] = useState(null);
+  const [isFromDatePickerVisible, setFromDatePickerVisibility] =
+    useState(false);
+  const [isToDatePickerVisible, setToDatePickerVisibility] = useState(false);
+
+  const [showWebFromCalendar, setShowWebFromCalendar] = useState(false);
+  const [showWebToCalendar, setShowWebToCalendar] = useState(false);
+  const [webCalendarDate, setWebCalendarDate] = useState(new Date());
+
   const targetUsrId = params.usrId || params.empId || user?.usrID;
+  const isWeb = Platform.OS === "web";
+
+  const { theme } = useTheme(); // Get theme from context
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      const handleClickOutside = (event) => {
+        if (!event.target.closest(".calendar-container")) {
+          setShowWebFromCalendar(false);
+          setShowWebToCalendar(false);
+        }
+      };
+
+      if (showWebFromCalendar || showWebToCalendar) {
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+          document.removeEventListener("mousedown", handleClickOutside);
+      }
+    }
+  }, [showWebFromCalendar, showWebToCalendar]);
+
+  // Modal DateTime Picker handlers
+  const showFromDatePicker = () => {
+    setFromDatePickerVisibility(true);
+  };
+
+  const hideFromDatePicker = () => {
+    setFromDatePickerVisibility(false);
+  };
+
+  const handleFromDateConfirm = (date) => {
+    setFilterFromDate(date);
+    hideFromDatePicker();
+  };
+
+  const showToDatePicker = () => {
+    setToDatePickerVisibility(true);
+  };
+
+  const hideToDatePicker = () => {
+    setToDatePickerVisibility(false);
+  };
+
+  const handleToDateConfirm = (date) => {
+    setFilterToDate(date);
+    hideToDatePicker();
+  };
 
   const parseTime = (timeStr) => {
     if (!timeStr || timeStr === "N/A") return null;
@@ -39,119 +105,154 @@ const DTRLog = () => {
     }
   };
 
-  const calculateHours = (filterByMonth = false) => {
+  const calculateHours = (fromDate = null, toDate = null) => {
     if (!dtrData || dtrData.length === 0) {
       return {
         totalHours: "0",
-        overtimeHours: "0",
-        regularHours: "0",
-        daysWorked: 0,
+        daysPresent: 0,
+        daysAbsent: 0,
       };
     }
 
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
-
     let totalMinutes = 0;
-    let overtimeMinutes = 0;
-    let daysCount = 0;
-    const REGULAR_HOURS_PER_DAY = 8;
-    const REGULAR_MINUTES_PER_DAY = REGULAR_HOURS_PER_DAY * 60;
+    let daysWithData = new Set();
+    let allUniqueDates = new Set();
+
+    let fromDateObj = null;
+    let toDateObj = null;
+
+    if (fromDate) {
+      fromDateObj = new Date(fromDate);
+      fromDateObj.setHours(0, 0, 0, 0);
+    }
+
+    if (toDate) {
+      toDateObj = new Date(toDate);
+      toDateObj.setHours(23, 59, 59, 999);
+    }
 
     dtrData.forEach((record) => {
-      if (filterByMonth && record.date && record.date !== "N/A") {
+      if (record.date && record.date !== "N/A") {
         try {
           const recordDate = new Date(record.date);
-          const recordMonth = recordDate.getMonth();
-          const recordYear = recordDate.getFullYear();
+          recordDate.setHours(0, 0, 0, 0);
 
-          if (recordMonth !== currentMonth || recordYear !== currentYear) {
-            return;
+          const isInRange =
+            (!fromDateObj || recordDate >= fromDateObj) &&
+            (!toDateObj || recordDate <= toDateObj);
+
+          if (isInRange) {
+            allUniqueDates.add(record.date);
+
+            let dayMinutes = 0;
+
+            const hasAmIn = record.timeInAM && record.timeInAM !== "N/A";
+            const hasAmOut = record.timeOutAM && record.timeOutAM !== "N/A";
+            const hasPmIn = record.timeInPM && record.timeInPM !== "N/A";
+            const hasPmOut = record.timeOutPM && record.timeOutPM !== "N/A";
+
+            if (hasAmIn && hasPmOut) {
+              const dayInMinutes = parseTime(record.timeInAM);
+              const dayOutMinutes = parseTime(record.timeOutPM);
+
+              if (dayInMinutes !== null && dayOutMinutes !== null) {
+                let duration = dayOutMinutes - dayInMinutes;
+                if (duration < 0) {
+                  duration += 24 * 60;
+                }
+                dayMinutes = duration;
+              }
+            } else {
+              if (hasAmIn && hasAmOut) {
+                const amInMinutes = parseTime(record.timeInAM);
+                const amOutMinutes = parseTime(record.timeOutAM);
+
+                if (amInMinutes !== null && amOutMinutes !== null) {
+                  let amDuration = amOutMinutes - amInMinutes;
+                  if (amDuration < 0) {
+                    amDuration += 24 * 60;
+                  }
+                  dayMinutes += amDuration;
+                }
+              }
+
+              if (hasPmIn && hasPmOut) {
+                const pmInMinutes = parseTime(record.timeInPM);
+                const pmOutMinutes = parseTime(record.timeOutPM);
+
+                if (pmInMinutes !== null && pmOutMinutes !== null) {
+                  let pmDuration = pmOutMinutes - pmInMinutes;
+                  if (pmDuration < 0) {
+                    pmDuration += 24 * 60;
+                  }
+                  dayMinutes += pmDuration;
+                }
+              }
+            }
+
+            totalMinutes += dayMinutes;
+
+            if (dayMinutes > 0) {
+              daysWithData.add(record.date);
+            }
           }
         } catch (e) {
           console.error("[DTRLog] Error parsing date:", record.date);
-          return;
         }
-      }
-
-      let dayMinutes = 0;
-
-      const hasAmIn = record.timeInAM && record.timeInAM !== "N/A";
-      const hasAmOut = record.timeOutAM && record.timeOutAM !== "N/A";
-      const hasPmIn = record.timeInPM && record.timeInPM !== "N/A";
-      const hasPmOut = record.timeOutPM && record.timeOutPM !== "N/A";
-
-      if (hasAmIn && hasPmOut) {
-        const dayInMinutes = parseTime(record.timeInAM);
-        const dayOutMinutes = parseTime(record.timeOutPM);
-
-        if (dayInMinutes !== null && dayOutMinutes !== null) {
-          let duration = dayOutMinutes - dayInMinutes;
-          if (duration < 0) {
-            duration += 24 * 60;
-          }
-          dayMinutes = duration;
-        }
-      } else {
-        if (hasAmIn && hasAmOut) {
-          const amInMinutes = parseTime(record.timeInAM);
-          const amOutMinutes = parseTime(record.timeOutAM);
-
-          if (amInMinutes !== null && amOutMinutes !== null) {
-            let amDuration = amOutMinutes - amInMinutes;
-            if (amDuration < 0) {
-              amDuration += 24 * 60;
-            }
-            dayMinutes += amDuration;
-          }
-        }
-
-        if (hasPmIn && hasPmOut) {
-          const pmInMinutes = parseTime(record.timeInPM);
-          const pmOutMinutes = parseTime(record.timeOutPM);
-
-          if (pmInMinutes !== null && pmOutMinutes !== null) {
-            let pmDuration = pmOutMinutes - pmInMinutes;
-            if (pmDuration < 0) {
-              pmDuration += 24 * 60;
-            }
-            dayMinutes += pmDuration;
-          }
-        }
-      }
-
-      totalMinutes += dayMinutes;
-
-      if (dayMinutes > 0) {
-        daysCount++;
-      }
-
-      if (dayMinutes > REGULAR_MINUTES_PER_DAY) {
-        overtimeMinutes += dayMinutes - REGULAR_MINUTES_PER_DAY;
       }
     });
 
+    const daysPresent = daysWithData.size;
+    const totalDaysInRange = allUniqueDates.size;
+    const daysAbsent = Math.max(0, totalDaysInRange - daysPresent);
     const totalHours = Math.round(totalMinutes / 60).toString();
-    const overtimeHours = Math.round(overtimeMinutes / 60).toString();
-    const regularMinutes = totalMinutes - overtimeMinutes;
-    const regularHours = Math.round(regularMinutes / 60).toString();
 
     return {
       totalHours,
-      overtimeHours,
-      regularHours,
-      daysWorked: filterByMonth ? daysCount : dtrData.length,
+      daysPresent,
+      daysAbsent,
     };
   };
 
-  const allTimeStats = calculateHours(false);
-  const { totalHours, overtimeHours, regularHours } = allTimeStats;
+  const allTimeStats = calculateHours(
+    appliedFromDate || null,
+    appliedToDate || null
+  );
+  const { totalHours, daysPresent, daysAbsent } = allTimeStats;
 
-  const totalPages = Math.ceil(dtrData.length / itemsPerPage);
+  const filteredData = dtrData.filter((record) => {
+    if (!appliedFromDate && !appliedToDate) return true;
+
+    if (record.date && record.date !== "N/A") {
+      try {
+        const recordDate = new Date(record.date);
+        recordDate.setHours(0, 0, 0, 0);
+
+        if (appliedFromDate) {
+          const fromDate = new Date(appliedFromDate);
+          fromDate.setHours(0, 0, 0, 0);
+          if (recordDate < fromDate) return false;
+        }
+
+        if (appliedToDate) {
+          const toDate = new Date(appliedToDate);
+          toDate.setHours(23, 59, 59, 999);
+          if (recordDate > toDate) return false;
+        }
+
+        return true;
+      } catch (e) {
+        console.error("[DTRLog] Error filtering date:", record.date);
+        return true;
+      }
+    }
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = dtrData.slice(startIndex, endIndex);
+  const currentData = filteredData.slice(startIndex, endIndex);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
@@ -163,6 +264,29 @@ const DTRLog = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
+  };
+
+  const handleSearchFilters = () => {
+    setAppliedFromDate(filterFromDate);
+    setAppliedToDate(filterToDate);
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setFilterFromDate(null);
+    setFilterToDate(null);
+    setAppliedFromDate(null);
+    setAppliedToDate(null);
+    setCurrentPage(1);
+  };
+
+  const formatDisplayDate = (date) => {
+    if (!date) return "Select Date";
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
   };
 
   useEffect(() => {
@@ -266,7 +390,7 @@ const DTRLog = () => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#FF8C00" />
+        <ActivityIndicator size="large" color={theme.primary} />
         <Text style={styles.loadingText}>Loading DTR records...</Text>
       </View>
     );
@@ -291,11 +415,8 @@ const DTRLog = () => {
     );
   }
 
-  // Donut chart component
-  const DonutChart = ({ regular, overtime }) => {
-    const regHours = Number.parseFloat(regular);
-    const overtimeHrs = Number.parseFloat(overtime);
-    const total = regHours + overtimeHrs;
+  const DonutChart = ({ daysPresent, daysAbsent }) => {
+    const total = daysPresent + daysAbsent;
 
     if (total === 0) {
       return (
@@ -307,23 +428,16 @@ const DTRLog = () => {
 
     const data = [
       {
-        name: "Regular Hours",
-        hours: regHours,
+        name: "Days Present",
+        hours: daysPresent || 0.1,
         color: "#EF4444",
         legendFontColor: "#1F2937",
         legendFontSize: 14,
       },
       {
-        name: "Overtime",
-        hours: overtimeHrs,
+        name: "Days Absent",
+        hours: daysAbsent || 0.1,
         color: "#FF8C00",
-        legendFontColor: "#1F2937",
-        legendFontSize: 14,
-      },
-      {
-        name: "Total Break",
-        hours: 0.1,
-        color: "#FFEB3B",
         legendFontColor: "#1F2937",
         legendFontSize: 14,
       },
@@ -349,9 +463,8 @@ const DTRLog = () => {
             width: 50,
             height: 50,
             borderRadius: 35,
-            // paddingLeft: 20,
             marginLeft: -5,
-            backgroundColor: "white", // or match your screen background
+            backgroundColor: "white",
           }}
         />
       </View>
@@ -360,8 +473,406 @@ const DTRLog = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.cardsScrollContainer}
+        contentContainerStyle={styles.cardsScrollContent}
+      >
+        {/* Filter by Date Range Card */}
+        <View style={styles.cardHorizontal}>
+          <View style={styles.filterHeader}>
+            <Text style={styles.filterTitle}>Filter by Date Range</Text>
+          </View>
+          <View
+            style={[
+              styles.filterContent,
+              (showWebFromCalendar || showWebToCalendar) && {
+                marginBottom: 380,
+              },
+            ]}
+          >
+            <View style={styles.filterInputGroup}>
+              <Text style={styles.filterLabel}>From:</Text>
+              {isWeb ? (
+                <View
+                  style={{
+                    position: "relative",
+                    zIndex: showWebFromCalendar ? 100 : 1,
+                  }}
+                  className="calendar-container"
+                >
+                  <Pressable
+                    style={styles.datePickerButton}
+                    onPress={() => {
+                      setWebCalendarDate(filterFromDate || new Date());
+                      setShowWebFromCalendar(!showWebFromCalendar);
+                      setShowWebToCalendar(false);
+                    }}
+                  >
+                    <Text style={styles.datePickerText}>
+                      {formatDisplayDate(filterFromDate)}
+                    </Text>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#6B7280"
+                    />
+                  </Pressable>
+
+                  {showWebFromCalendar && (
+                    <View style={styles.webCalendarDropdown}>
+                      <View style={styles.calendarHeader}>
+                        <Pressable
+                          onPress={() =>
+                            setWebCalendarDate(
+                              new Date(
+                                webCalendarDate.getFullYear(),
+                                webCalendarDate.getMonth() - 1,
+                                1
+                              )
+                            )
+                          }
+                          style={styles.calendarNavBtn}
+                        >
+                          <Text style={styles.calendarNavText}>←</Text>
+                        </Pressable>
+                        <Text style={styles.calendarMonthYear}>
+                          {webCalendarDate.toLocaleString("default", {
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </Text>
+                        <Pressable
+                          onPress={() =>
+                            setWebCalendarDate(
+                              new Date(
+                                webCalendarDate.getFullYear(),
+                                webCalendarDate.getMonth() + 1,
+                                1
+                              )
+                            )
+                          }
+                          style={styles.calendarNavBtn}
+                        >
+                          <Text style={styles.calendarNavText}>→</Text>
+                        </Pressable>
+                      </View>
+
+                      <View style={styles.calendarWeekDays}>
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                          (day) => (
+                            <Text key={day} style={styles.calendarWeekDay}>
+                              {day}
+                            </Text>
+                          )
+                        )}
+                      </View>
+
+                      <View style={styles.calendarDaysGrid}>
+                        {(() => {
+                          const year = webCalendarDate.getFullYear();
+                          const month = webCalendarDate.getMonth();
+                          const firstDay = new Date(year, month, 1).getDay();
+                          const daysInMonth = new Date(
+                            year,
+                            month + 1,
+                            0
+                          ).getDate();
+                          const days = [];
+
+                          for (let i = 0; i < firstDay; i++) {
+                            days.push(
+                              <View
+                                key={`empty-${i}`}
+                                style={styles.calendarDayCell}
+                              />
+                            );
+                          }
+
+                          for (let day = 1; day <= daysInMonth; day++) {
+                            const currentDay = day;
+                            days.push(
+                              <Pressable
+                                key={day}
+                                style={styles.calendarDayCell}
+                                onPress={() => {
+                                  const selected = new Date(
+                                    year,
+                                    month,
+                                    currentDay
+                                  );
+                                  setFilterFromDate(selected);
+                                  setShowWebFromCalendar(false);
+                                }}
+                              >
+                                <Text style={styles.calendarDayText}>
+                                  {day}
+                                </Text>
+                              </Pressable>
+                            );
+                          }
+
+                          return days;
+                        })()}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.datePickerButton}
+                  onPress={showFromDatePicker}
+                >
+                  <Text style={styles.datePickerText}>
+                    {formatDisplayDate(filterFromDate)}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.filterInputGroup}>
+              <Text style={styles.filterLabel}>To:</Text>
+              {isWeb ? (
+                <View
+                  style={{
+                    position: "relative",
+                    zIndex: showWebToCalendar ? 100 : 1,
+                  }}
+                  className="calendar-container"
+                >
+                  <Pressable
+                    style={styles.datePickerButton}
+                    onPress={() => {
+                      setWebCalendarDate(filterToDate || new Date());
+                      setShowWebToCalendar(!showWebToCalendar);
+                      setShowWebFromCalendar(false);
+                    }}
+                  >
+                    <Text style={styles.datePickerText}>
+                      {formatDisplayDate(filterToDate)}
+                    </Text>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#6B7280"
+                    />
+                  </Pressable>
+
+                  {showWebToCalendar && (
+                    <View style={styles.webCalendarDropdown}>
+                      <View style={styles.calendarHeader}>
+                        <Pressable
+                          onPress={() =>
+                            setWebCalendarDate(
+                              new Date(
+                                webCalendarDate.getFullYear(),
+                                webCalendarDate.getMonth() - 1,
+                                1
+                              )
+                            )
+                          }
+                          style={styles.calendarNavBtn}
+                        >
+                          <Text style={styles.calendarNavText}>←</Text>
+                        </Pressable>
+                        <Text style={styles.calendarMonthYear}>
+                          {webCalendarDate.toLocaleString("default", {
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </Text>
+                        <Pressable
+                          onPress={() =>
+                            setWebCalendarDate(
+                              new Date(
+                                webCalendarDate.getFullYear(),
+                                webCalendarDate.getMonth() + 1,
+                                1
+                              )
+                            )
+                          }
+                          style={styles.calendarNavBtn}
+                        >
+                          <Text style={styles.calendarNavText}>→</Text>
+                        </Pressable>
+                      </View>
+
+                      <View style={styles.calendarWeekDays}>
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                          (day) => (
+                            <Text key={day} style={styles.calendarWeekDay}>
+                              {day}
+                            </Text>
+                          )
+                        )}
+                      </View>
+
+                      <View style={styles.calendarDaysGrid}>
+                        {(() => {
+                          const year = webCalendarDate.getFullYear();
+                          const month = webCalendarDate.getMonth();
+                          const firstDay = new Date(year, month, 1).getDay();
+                          const daysInMonth = new Date(
+                            year,
+                            month + 1,
+                            0
+                          ).getDate();
+                          const days = [];
+
+                          for (let i = 0; i < firstDay; i++) {
+                            days.push(
+                              <View
+                                key={`empty-${i}`}
+                                style={styles.calendarDayCell}
+                              />
+                            );
+                          }
+
+                          for (let day = 1; day <= daysInMonth; day++) {
+                            const currentDay = day;
+                            days.push(
+                              <Pressable
+                                key={day}
+                                style={styles.calendarDayCell}
+                                onPress={() => {
+                                  const selected = new Date(
+                                    year,
+                                    month,
+                                    currentDay
+                                  );
+                                  setFilterToDate(selected);
+                                  setShowWebToCalendar(false);
+                                }}
+                              >
+                                <Text style={styles.calendarDayText}>
+                                  {day}
+                                </Text>
+                              </Pressable>
+                            );
+                          }
+
+                          return days;
+                        })()}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.datePickerButton}
+                  onPress={showToDatePicker}
+                >
+                  <Text style={styles.datePickerText}>
+                    {formatDisplayDate(filterToDate)}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Modal DateTime Pickers for Mobile only */}
+          {!isWeb && (
+            <>
+              <DateTimePickerModal
+                isVisible={isFromDatePickerVisible}
+                mode="date"
+                onConfirm={handleFromDateConfirm}
+                onCancel={hideFromDatePicker}
+                date={filterFromDate || new Date()}
+                display="spinner"
+              />
+              <DateTimePickerModal
+                isVisible={isToDatePickerVisible}
+                mode="date"
+                onConfirm={handleToDateConfirm}
+                onCancel={hideToDatePicker}
+                date={filterToDate || new Date()}
+                display="spinner"
+              />
+            </>
+          )}
+
+          <View style={styles.filterButtonContainer}>
+            <Pressable
+              style={[styles.filterButton, styles.clearButton]}
+              onPress={handleClearFilters}
+            >
+              <Ionicons
+                name="close-circle"
+                size={14}
+                color="#FFFFFF"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.clearButtonText}>Clear Date</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterButton, styles.searchButton]}
+              onPress={handleSearchFilters}
+            >
+              <Ionicons
+                name="search"
+                size={14}
+                color="#FFFFFF"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.searchButtonText}>Search</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Attendance Summary Card */}
+        <View style={styles.cardHorizontal}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Attendance Summary</Text>
+          </View>
+          <View style={styles.cardContent}>
+            {/* Left side - Legend */}
+            <View style={styles.legendContainer}>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
+                />
+                <View>
+                  <Text style={styles.legendLabel}>
+                    {daysPresent} Days Present
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#FF8C00" }]}
+                />
+                <View>
+                  <Text style={styles.legendLabel}>
+                    {daysAbsent} Days Absent
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.totalSection}>
+                <Text style={styles.totalLabel}>
+                  Total Hours{" "}
+                  {appliedFromDate || appliedToDate
+                    ? "in Range"
+                    : "of the Month"}
+                  : {totalHours}
+                </Text>
+              </View>
+            </View>
+
+            {/* Right side - Chart */}
+            <DonutChart daysPresent={daysPresent} daysAbsent={daysAbsent} />
+          </View>
+        </View>
+      </ScrollView>
       {/* Header */}
-      <View style={{ marginBottom: 16 }}>
+      <View style={{ marginBottom: 5 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={{ color: "#FF7700", fontSize: 18 }}>▶</Text>
           <Text
@@ -370,60 +881,17 @@ const DTRLog = () => {
               fontWeight: "600",
               color: "#1f2937",
               marginLeft: 8,
-              fontWeight: "600",
             }}
           >
             {displayName}'s Log
           </Text>
         </View>
       </View>
-
-      {/* Card Section */}
-      <View style={styles.card}>
-        <View style={styles.cardContent}>
-          {/* Left side - Legend */}
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendDot, { backgroundColor: "#EF4444" }]}
-              />
-              <View>
-                {/* <Text style={styles.legendNumber}></Text> */}
-                <Text style={styles.legendLabel}>
-                  {regularHours} Regular Hour
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.legendItem}>
-              <View
-                style={[styles.legendDot, { backgroundColor: "#FF8C00" }]}
-              />
-              <View>
-                {/* <Text style={styles.legendNumber}></Text> */}
-                <Text style={styles.legendLabel}>{overtimeHours} Overtime</Text>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.totalSection}>
-              <Text style={styles.totalLabel}>
-                Total Hours of the Month: {totalHours}
-              </Text>
-            </View>
-          </View>
-
-          {/* Right side - Chart */}
-          <DonutChart regular={regularHours} overtime={overtimeHours} />
-        </View>
-      </View>
-
       {/* Table Section */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.tableScroll}
+        style={[styles.tableScroll, { marginTop: 8 }]}
       >
         <View style={styles.table}>
           <View style={styles.tableRow}>
@@ -436,17 +904,22 @@ const DTRLog = () => {
               Name
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 170 }]}
-            >
-              School
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 140 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
             >
               Time In (AM)
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 140 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+            >
+              Time Out (AM)
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+            >
+              Time In (PM)
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
             >
               Time Out (PM)
             </Text>
@@ -466,13 +939,16 @@ const DTRLog = () => {
               <Text style={[styles.tableCell, { width: 200 }]}>
                 {item.name}
               </Text>
-              <Text style={[styles.tableCell, { width: 170 }]}>
-                {item.school}
-              </Text>
-              <Text style={[styles.tableCell, { width: 140 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>
                 {item.timeInAM}
               </Text>
-              <Text style={[styles.tableCell, { width: 140 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>
+                {item.timeOutAM}
+              </Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>
+                {item.timeInPM}
+              </Text>
+              <Text style={[styles.tableCell, { width: 120 }]}>
                 {item.timeOutPM}
               </Text>
               <Text style={[styles.tableCell, { width: 120 }]}>
@@ -513,170 +989,336 @@ const DTRLog = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 16,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: "#666",
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#EF4444",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#999",
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  legendContainer: {
-    flex: 0,
-    minWidth: 180,
-    paddingRight: 20,
-    justifyContent: "center",
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  legendDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 2,
-    marginRight: 8,
-    marginTop: 2,
-  },
-  legendNumber: {
-    fontSize: 14,
-    color: "#1F2937",
-    fontWeight: "600",
-  },
-  legendLabel: {
-    fontSize: 11,
-    color: "#6B7280",
-    lineHeight: 14,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#E5E7EB",
-    marginVertical: 12,
-  },
-  totalSection: {
-    marginTop: 4,
-  },
-  totalLabel: {
-    fontSize: 11,
-    color: "#6B7280",
-    fontWeight: "400",
-    marginBottom: 6,
-    lineHeight: 14,
-  },
-  totalValue: {
-    fontSize: 28,
-    color: "#3B82F6",
-    fontWeight: "700",
-  },
-  chartContainer: {
-    justifyContent: "flex-start",
-    alignItems: "center",
-  },
-  noDataText: {
-    fontSize: 14,
-    color: "#999",
-  },
-  tableScroll: {
-    marginBottom: 24,
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-  },
-  tableRowAlt: {
-    backgroundColor: "#F9FAFB",
-  },
-  tableCell: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontSize: 12,
-    color: "#374151",
-    borderRightWidth: 1,
-    borderRightColor: "#E5E7EB",
-  },
-  tableHeader: {
-    backgroundColor: "#FF8C00",
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-  },
-  paginationButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#FF8C00",
-    borderRadius: 6,
-  },
-  paginationButtonDisabled: {
-    backgroundColor: "#D1D5DB",
-  },
-  paginationButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  pageInfo: {
-    fontSize: 12,
-    color: "#4B5563",
-    fontWeight: "500",
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#FAFAFA",
+      padding: 16,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 16,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 14,
+      color: "#666",
+    },
+    errorText: {
+      fontSize: 14,
+      color: "#EF4444",
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    debugText: {
+      fontSize: 12,
+      color: "#999",
+      textAlign: "center",
+    },
+    emptyText: {
+      fontSize: 14,
+      color: "#999",
+    },
+    card: {
+      backgroundColor: "#FFFFFF",
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    cardsScrollContainer: {
+      marginBottom: 7,
+    },
+    cardsScrollContent: {
+      flexDirection: "row",
+      gap: 5,
+      paddingRight: 16,
+    },
+    cardHorizontal: {
+      backgroundColor: "#FFFFFF",
+      borderRadius: 16,
+      padding: 10,
+      marginBottom: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+      minWidth: 300,
+      width: 300,
+    },
+    filterHeader: {
+      marginBottom: 16,
+    },
+    filterTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#1F2937",
+    },
+    filterContent: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 12,
+      gap: 12,
+      position: "relative",
+    },
+    filterInputGroup: {
+      flex: 1,
+      position: "relative",
+      zIndex: 10,
+    },
+    filterLabel: {
+      fontSize: 11,
+      color: "#6B7280",
+      marginBottom: 6,
+      fontWeight: "500",
+    },
+    datePickerButton: {
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: "#FFFFFF",
+    },
+    datePickerText: {
+      fontSize: 12,
+      color: "#1F2937",
+    },
+    filterButtonContainer: {
+      flexDirection: "row",
+      gap: 5,
+    },
+    filterButton: {
+      flex: 1,
+      paddingVertical: 7,
+      borderRadius: 6,
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "center",
+    },
+    searchButton: {
+      backgroundColor: "#FF8C00",
+    },
+    searchButtonText: {
+      color: "#FFFFFF",
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    clearButton: {
+      backgroundColor: "#EF4444",
+    },
+    clearButtonText: {
+      color: "#FFFFFF",
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    cardHeader: {
+      marginBottom: 12,
+    },
+    cardTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#1F2937",
+    },
+    cardContent: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+    },
+    legendContainer: {
+      flex: 0,
+      minWidth: 180,
+      paddingRight: 20,
+      justifyContent: "center",
+    },
+    legendItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginBottom: 10,
+    },
+    legendDot: {
+      width: 14,
+      height: 14,
+      borderRadius: 2,
+      marginRight: 8,
+      marginTop: 2,
+    },
+    legendLabel: {
+      fontSize: 11,
+      color: "#6B7280",
+      lineHeight: 14,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: "#E5E7EB",
+      marginVertical: 12,
+    },
+    totalSection: {
+      marginTop: 4,
+    },
+    totalLabel: {
+      fontSize: 11,
+      color: "#6B7280",
+      fontWeight: "400",
+      marginBottom: 6,
+      lineHeight: 14,
+    },
+    chartContainer: {
+      justifyContent: "flex-start",
+      alignItems: "center",
+    },
+    noDataText: {
+      fontSize: 14,
+      color: "#999",
+    },
+    tableScroll: {
+      marginBottom: 24,
+    },
+    table: {
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: 8,
+      overflow: "hidden",
+    },
+    tableRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#E5E7EB",
+      backgroundColor: "#FFFFFF",
+    },
+    tableRowAlt: {
+      backgroundColor: "#F9FAFB",
+    },
+    tableCell: {
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      fontSize: 12,
+      color: theme.contentText, // Dynamic theme color
+      borderRightWidth: 1,
+      borderRightColor: "#E5E7EB",
+    },
+    tableHeader: {
+      backgroundColor: theme.cardHeader, // Dynamic theme color
+      color: theme.buttonText, // Dynamic theme color
+      fontWeight: "600",
+      fontSize: 13,
+    },
+    webCalendarDropdown: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      minWidth: 280,
+      maxWidth: 320,
+      backgroundColor: "#FFFFFF",
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 16,
+      elevation: 10,
+      zIndex: 9999,
+    },
+    calendarHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "#F3F4F6",
+    },
+    calendarNavBtn: {
+      padding: 8,
+      borderRadius: 6,
+      backgroundColor: "#F9FAFB",
+      width: 36,
+      height: 36,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    calendarNavText: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#374151",
+    },
+    calendarMonthYear: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: "#1F2937",
+    },
+    calendarWeekDays: {
+      flexDirection: "row",
+      marginBottom: 8,
+      paddingBottom: 8,
+    },
+    calendarWeekDay: {
+      flex: 1,
+      textAlign: "center",
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#9CA3AF",
+    },
+    calendarDaysGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 2,
+    },
+    calendarDayCell: {
+      width: "13.5%",
+      aspectRatio: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      borderRadius: 6,
+      margin: 1,
+    },
+    calendarDayText: {
+      fontSize: 14,
+      color: "#1F2937",
+      fontWeight: "500",
+    },
+    paginationContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 16,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: "#E5E7EB",
+    },
+    paginationButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: "#FF8C00",
+      borderRadius: 6,
+    },
+    paginationButtonDisabled: {
+      backgroundColor: "#D1D5DB",
+    },
+    paginationButtonText: {
+      color: theme.buttonText, // Dynamic theme color
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    pageInfo: {
+      fontSize: 12,
+      color: "#4B5563",
+      fontWeight: "500",
+    },
+  });
 
 export default DTRLog;

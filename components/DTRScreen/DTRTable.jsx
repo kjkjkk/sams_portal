@@ -1,9 +1,10 @@
 "use client";
 import { useAuth } from "@/contexts/AuthContexts";
+import { useTheme } from "@/contexts/ThemeContext"; // Add this import
 import ApiService from "@/services/api";
 import { isAdminUser } from "@/utils/roleUtils";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react"; // Add useMemo
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +16,7 @@ import {
 
 const DTRTable = ({ selectedUserType, searchText }) => {
   const { user, loading: authLoading } = useAuth();
+  const { theme } = useTheme(); // Get theme from context
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage] = useState(10);
   const [allUsers, setAllUsers] = useState([]);
@@ -24,13 +26,17 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   const [error, setError] = useState(null);
   const router = useRouter();
 
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // ... rest of your existing useEffect hooks and functions remain the same ...
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         console.log("[DTRTable] ===== Fetching all DTR records =====");
 
-        // Fetch DTR records
         const dtrResponse = await ApiService.getAllDTRRecords();
         console.log("[DTRTable] API Response received");
 
@@ -38,7 +44,6 @@ const DTRTable = ({ selectedUserType, searchText }) => {
           const records = dtrResponse.data;
           console.log("[DTRTable] Total records received:", records.length);
 
-          // Group records by user to get unique users
           const userMap = new Map();
 
           records.forEach((record) => {
@@ -58,21 +63,17 @@ const DTRTable = ({ selectedUserType, searchText }) => {
                 latest_date: record.tme_date,
               });
             } else {
-              // Increment record count for this user
               const existing = userMap.get(userId);
               existing.total_records += 1;
 
-              // Update to latest date if newer
               if (new Date(record.tme_date) > new Date(existing.latest_date)) {
                 existing.latest_date = record.tme_date;
               }
             }
           });
 
-          // Convert map to array
           const uniqueUsers = Array.from(userMap.values());
           console.log("[DTRTable] Unique users:", uniqueUsers.length);
-          console.log("[DTRTable] Sample user data:", uniqueUsers.slice(0, 2));
 
           setAllUsers(uniqueUsers);
           setError(null);
@@ -96,39 +97,16 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   }, [authLoading, user]);
 
   useEffect(() => {
-    console.log("[DTRTable] Filter effect triggered");
-    console.log("[DTRTable] selectedUserType:", selectedUserType);
-    console.log("[DTRTable] searchText:", searchText);
-    console.log("[DTRTable] allUsers count:", allUsers.length);
-
     let filtered = [...allUsers];
 
-    // Filter by user type (if selectedUserType is not null/"All")
     if (selectedUserType !== null && selectedUserType !== undefined) {
-      console.log("[DTRTable] Filtering by user type:", selectedUserType);
-      const beforeFilter = filtered.length;
-
       filtered = filtered.filter((item) => {
-        const matches = Number(item.user_type) === Number(selectedUserType);
-        if (!matches && beforeFilter < 20) {
-          console.log(
-            `[DTRTable] User ${item.emp_name}: user_type=${item.user_type} vs selectedUserType=${selectedUserType}`
-          );
-        }
-        return matches;
+        return Number(item.user_type) === Number(selectedUserType);
       });
-
-      console.log(
-        `[DTRTable] After user type filter: ${beforeFilter} -> ${filtered.length}`
-      );
     }
 
-    // Filter by search text
     if (searchText && searchText.trim() !== "") {
-      console.log("[DTRTable] Filtering by search text:", searchText);
       const searchLower = searchText.toLowerCase();
-      const beforeSearch = filtered.length;
-
       filtered = filtered.filter((item) => {
         const name = item.emp_name?.toLowerCase() || "";
         const school = item.school_name?.toLowerCase() || "";
@@ -142,24 +120,14 @@ const DTRTable = ({ selectedUserType, searchText }) => {
           id.includes(searchLower)
         );
       });
-
-      console.log(
-        `[DTRTable] After search filter: ${beforeSearch} -> ${filtered.length}`
-      );
     }
 
     setFilteredUsers(filtered);
 
-    // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
     const paginated = filtered.slice(startIndex, startIndex + rowsPerPage);
     setDisplayedUsers(paginated);
 
-    console.log(
-      `[DTRTable] Displaying ${paginated.length} users on page ${currentPage}`
-    );
-
-    // Reset to page 1 if current page exceeds total pages
     const totalPages = Math.ceil(filtered.length / rowsPerPage);
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
@@ -167,9 +135,6 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   }, [selectedUserType, searchText, currentPage, rowsPerPage, allUsers]);
 
   const handleViewUser = (userId) => {
-    console.log("[DTRTable] ===== Navigating to DTR logs =====");
-    console.log("[DTRTable] userId:", userId);
-
     if (!userId) {
       console.error("[DTRTable] No valid user ID found!");
       return;
@@ -210,7 +175,7 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   if (authLoading || loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#F97316" />
+        <ActivityIndicator size="large" color={theme.primary} />
         <Text style={styles.loadingText}>Loading users...</Text>
       </View>
     );
@@ -259,9 +224,7 @@ const DTRTable = ({ selectedUserType, searchText }) => {
         showsHorizontalScrollIndicator={false}
         style={styles.cardsScrollView}
       >
-        {/* Table Section */}
         <View style={styles.table}>
-          {/* Table Header */}
           <View style={styles.tableRow}>
             <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
               User ID
@@ -296,7 +259,6 @@ const DTRTable = ({ selectedUserType, searchText }) => {
             </Text>
           </View>
 
-          {/* Table Rows */}
           {displayedUsers.map((item, index) => (
             <View
               key={`user-${item.usr_id}-${index}`}
@@ -342,7 +304,7 @@ const DTRTable = ({ selectedUserType, searchText }) => {
           ))}
         </View>
       </ScrollView>
-      {/* Pagination Controls */}
+
       <View style={styles.paginationContainer}>
         <Pressable
           style={[
@@ -374,106 +336,108 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: "100%",
-    paddingBottom: 24,
-  },
-  table: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
-  },
-  tableHeader: {
-    backgroundColor: "#F97316",
-    color: "#FFFFFF",
-    fontWeight: "600",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontSize: 13,
-  },
-  tableCell: {
-    fontSize: 12,
-    color: "#374151",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRightWidth: 1,
-    borderRightColor: "#E5E7EB",
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-  },
-  tableRowAlt: {
-    backgroundColor: "#F9FAFB",
-  },
-  actionButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#F97316",
-    borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  actionButtonText: {
-    fontSize: 12,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-  },
-  paginationButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: "#F97316",
-    borderRadius: 6,
-  },
-  paginationButtonDisabled: {
-    backgroundColor: "#D1D5DB",
-  },
-  paginationButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  pageInfo: {
-    fontSize: 12,
-    color: "#4B5563",
-    fontWeight: "500",
-  },
-  centerContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-    minHeight: 200,
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#EF4444",
-    textAlign: "center",
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#999",
-  },
-});
+// Move styles to a function that accepts theme
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      width: "100%",
+      paddingBottom: 24,
+    },
+    table: {
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: 8,
+      overflow: "hidden",
+      backgroundColor: "#FFFFFF",
+    },
+    tableHeader: {
+      backgroundColor: theme.cardHeader, // Dynamic theme color
+      color: theme.buttonText, // Dynamic theme color
+      fontWeight: "600",
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      fontSize: 13,
+    },
+    tableCell: {
+      fontSize: 12,
+      color: theme.contentText, // Dynamic theme color
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      borderRightWidth: 1,
+      borderRightColor: "#E5E7EB",
+    },
+    tableRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: "#E5E7EB",
+      backgroundColor: "#FFFFFF",
+    },
+    tableRowAlt: {
+      backgroundColor: "#F9FAFB",
+    },
+    actionButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: theme.buttonHover, // Dynamic theme color
+      borderRadius: 4,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    actionButtonText: {
+      fontSize: 12,
+      color: theme.buttonText, // Dynamic theme color
+      fontWeight: "600",
+    },
+    paginationContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 16,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: "#E5E7EB",
+      backgroundColor: "#FFFFFF",
+    },
+    paginationButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: theme.buttonHover, // Dynamic theme color
+      borderRadius: 6,
+    },
+    paginationButtonDisabled: {
+      backgroundColor: "#D1D5DB",
+    },
+    paginationButtonText: {
+      color: theme.buttonText, // Dynamic theme color
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    pageInfo: {
+      fontSize: 12,
+      color: "#4B5563",
+      fontWeight: "500",
+    },
+    centerContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+      minHeight: 200,
+    },
+    errorText: {
+      fontSize: 14,
+      color: "#EF4444",
+      textAlign: "center",
+    },
+    loadingText: {
+      fontSize: 14,
+      color: "#666",
+      marginTop: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: "#999",
+    },
+  });
 
 export default DTRTable;
