@@ -7,22 +7,24 @@
  * Admin role IDs (adjust these based on your usertypes table)
  * Update these with the actual typID values for Admin and LMS roles
  */
-const ADMIN_ROLES = [1, 2]; // Example: 1 = Admin, 2 = LMS Admin (update with your actual IDs)
+const ADMIN_ROLES = [1]; // Example: 1 = Admin, 2 = LMS Admin (update with your actual IDs)
 
 /**
  * Check if user has admin access to view all DTR records
  */
-export const isAdminUser = (usrType) => {
+export const isSuperAdminUser = (usrType) => {
   return (
     usrType !== null && usrType !== undefined && ADMIN_ROLES.includes(usrType)
   );
 };
 
+export const isLMSAdminUser = (usrType) => {
+  return usrType === 2;
+};
 /**
  * Check if user is a student
  */
 export const isStudentUser = (usrType) => {
-  // Adjust this ID based on your usertypes table (e.g., 3 = Student)
   return usrType === 4;
 };
 

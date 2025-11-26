@@ -96,12 +96,20 @@ const HomeScreen = () => {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            paddingHorizontal: 24,
+            paddingHorizontal: 16,
             paddingVertical: 16,
           }}
         >
-          <Ionicons name="home-sharp" size={24} color="#333" />
-          <Text style={{ fontSize: 20, fontWeight: "bold", marginLeft: 8 }}>
+          <Ionicons name="home-sharp" size={36} color="#000" />
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "700",
+              color: "#000",
+              letterSpacing: 0.5,
+              marginLeft: 8,
+            }}
+          >
             Home
           </Text>
           <View

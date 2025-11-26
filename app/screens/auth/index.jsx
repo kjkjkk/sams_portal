@@ -14,43 +14,124 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 export default function LoginScreen() {
-  const [username, setUsername] = useState(""); // Changed from email
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null); // ✅ Added error state
   const router = useRouter();
-  const { login, user, isAuthenticated } = useAuth();
+  const { login, user, isAuthenticated, loading: authLoading } = useAuth();
+
+  // ✅ Debug: Log auth state changes
+  useEffect(() => {
+    console.log("[Login] Auth State:", {
+      isAuthenticated,
+      user: user
+        ? {
+            usrID: user.usrID,
+            usrType: user.usrType,
+            accID: user.accID,
+            name: `${user.usrFirstName} ${user.usrLastName}`,
+          }
+        : null,
+      authLoading,
+    });
+  }, [isAuthenticated, user, authLoading]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      // Changed from stdId to id
-      console.log("[Login] User already authenticated, redirecting to home");
+    // ✅ Fixed: Check for usrID instead of id
+    if (isAuthenticated && user?.usrID) {
+      console.log("[Login] User authenticated, redirecting to home");
+      console.log("[Login] User details:", {
+        usrID: user.usrID,
+        accID: user.accID,
+        usrType: user.usrType,
+      });
       router.replace("/screens/home");
     }
   }, [isAuthenticated, user, router]);
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert("Error", "Username and password are required");
+    // ✅ Clear previous errors
+    setError(null);
+
+    // ✅ Input validation with detailed messages
+    if (!username.trim()) {
+      const errorMsg = "Username is required";
+      setError(errorMsg);
+      Alert.alert("Validation Error", errorMsg);
+      console.log("[Login] Validation failed: Username empty");
+      return;
+    }
+
+    if (!password.trim()) {
+      const errorMsg = "Password is required";
+      setError(errorMsg);
+      Alert.alert("Validation Error", errorMsg);
+      console.log("[Login] Validation failed: Password empty");
       return;
     }
 
     setLoading(true);
+    console.log("[Login] ===== Login Attempt Started =====");
+    console.log("[Login] Username:", username.trim());
 
     try {
-      await login(username.trim(), password); // Removed toLowerCase() unless needed
-      console.log("[Login] Login successful, navigating to home");
-      router.replace("/screens/home");
+      console.log("[Login] Calling login function...");
+      const result = await login(username.trim(), password);
+
+      console.log("[Login] Login function returned:", result);
+      console.log("[Login] ===== Login Successful =====");
+
+      // ✅ Wait a bit for auth state to update
+      setTimeout(() => {
+        console.log("[Login] Navigating to home...");
+        router.replace("/screens/home");
+      }, 100);
     } catch (error) {
-      console.error("[Login] Login error:", error);
-      Alert.alert(
-        "Login Failed",
-        error.message || "Invalid username or password. Please try again."
-      );
+      console.error("[Login] ===== Login Error =====");
+      console.error("[Login] Error object:", error);
+      console.error("[Login] Error message:", error.message);
+      console.error("[Login] Error stack:", error.stack);
+
+      // ✅ Determine error type and show appropriate message
+      let errorMessage = "An unexpected error occurred. Please try again.";
+
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response) {
+        // API error response
+        console.error("[Login] API Response:", error.response);
+        errorMessage = error.response.data?.message || "Server error occurred";
+      } else if (error.request) {
+        // Network error
+        console.error("[Login] Network error:", error.request);
+        errorMessage = "Network error. Please check your connection.";
+      }
+
+      setError(errorMessage);
+      Alert.alert("Login Failed", errorMessage);
     } finally {
       setLoading(false);
+      console.log("[Login] ===== Login Attempt Ended =====");
     }
   };
+
+  // ✅ Show loading indicator while checking auth
+  if (authLoading) {
+    return (
+      <View
+        style={[
+          loginStyles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color="#FF8C00" />
+        <Text style={{ marginTop: 10, color: "#666" }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -70,6 +151,23 @@ export default function LoginScreen() {
         <Text style={loginStyles.promptText}>Please login to continue</Text>
       </View>
 
+      {/* ✅ Error Display */}
+      {error && (
+        <View
+          style={{
+            backgroundColor: "#FEE",
+            padding: 12,
+            borderRadius: 8,
+            marginHorizontal: 20,
+            marginBottom: 10,
+            borderLeftWidth: 4,
+            borderLeftColor: "#F00",
+          }}
+        >
+          <Text style={{ color: "#C00", fontSize: 13 }}>⚠️ {error}</Text>
+        </View>
+      )}
+
       <View style={loginStyles.formSection}>
         {/* Username Field */}
         <View style={loginStyles.fieldContainer}>
@@ -78,10 +176,14 @@ export default function LoginScreen() {
             style={loginStyles.input}
             placeholder="Enter your username"
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(text) => {
+              setUsername(text);
+              setError(null); // ✅ Clear error on input
+            }}
             placeholderTextColor="#999"
             autoCapitalize="none"
             editable={!loading}
+            returnKeyType="next"
           />
         </View>
 
@@ -92,10 +194,15 @@ export default function LoginScreen() {
             style={loginStyles.input}
             placeholder="Enter your password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              setError(null); // ✅ Clear error on input
+            }}
             secureTextEntry
             placeholderTextColor="#999"
             editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
           />
         </View>
 

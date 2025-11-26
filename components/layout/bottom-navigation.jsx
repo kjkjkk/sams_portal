@@ -2,9 +2,8 @@
 
 import SlidingSettingsPanel from "@/components/SlidingSettingsPanel";
 import { useAuth } from "@/contexts/AuthContexts";
-// import bottomNavStyles from "@/styles/layoutStyles/bottom-navigation";
-import { useTheme } from "@/contexts/ThemeContext"; // Add this import
-import { isAdminUser } from "@/utils/roleUtils";
+import { useTheme } from "@/contexts/ThemeContext";
+import { isLMSAdminUser, isSuperAdminUser } from "@/utils/roleUtils"; // ✅ Import both
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -13,17 +12,21 @@ import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 const BottomNavigation = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { theme } = useTheme(); // Add this line
-  const isAdmin = isAdminUser(user?.usrType);
+  const { theme } = useTheme();
+  const isSuperAdmin = isSuperAdminUser(user?.usrType);
+  const isLMSAdmin = isLMSAdminUser(user?.usrType); // ✅ Check LMS Admin
   const [isSettingsPanelVisible, setIsSettingsPanelVisible] = useState(false);
 
   // Create dynamic styles based on theme
-  const bottomNavStyles = useMemo(() => createStyles(theme), [theme]); // Add this line
+  const bottomNavStyles = useMemo(() => createStyles(theme), [theme]);
 
+  // ✅ FIXED: Both Super Admin and LMS Admin can access DTR table
   const handleDtrNavigation = () => {
-    if (isAdmin) {
+    if (isSuperAdmin || isLMSAdmin) {
+      // ✅ Both go to DTR table
       router.push("/screens/dtr");
     } else {
+      // ✅ Everyone else sees their own logs
       router.push("/screens/dtrlogs");
     }
   };
@@ -53,14 +56,10 @@ const BottomNavigation = () => {
         <TouchableOpacity
           style={bottomNavStyles.navItem}
           onPress={handleDtrNavigation}
-          title={isAdmin ? "DTR Table (Admin)" : "My DTR Logs"}
+          title={isSuperAdmin || isLMSAdmin ? "DTR Management" : "My DTR Logs"}
         >
           <Ionicons name="time" size={24} color="#fff" />
         </TouchableOpacity>
-
-        {/* <TouchableOpacity style={bottomNavStyles.navItem}>
-          <Ionicons name="folder" size={24} color="#fff" />
-        </TouchableOpacity> */}
 
         <TouchableOpacity
           style={bottomNavStyles.navItem}
@@ -81,7 +80,7 @@ const createStyles = (theme) =>
       left: 0,
       right: 0,
       flexDirection: "row",
-      backgroundColor: theme.footer, // Dynamic theme color
+      backgroundColor: theme.footer,
       paddingVertical: 12,
       justifyContent: "space-around",
       alignItems: "center",

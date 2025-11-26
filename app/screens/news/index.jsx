@@ -11,7 +11,6 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -198,6 +197,13 @@ const NewsScreen = () => {
     navigation.navigate("detail", { item });
   };
 
+  // ✅ Added the missing function
+  const handleCreateArticle = () => {
+    // Navigate to create article screen or open modal
+    console.log("Create new article");
+    // Example: navigation.navigate("CreateArticle");
+  };
+
   return (
     <SafeAreaView style={newStyles.container}>
       <ScrollView
@@ -229,7 +235,7 @@ const NewsScreen = () => {
           <View style={newStyles.newsIconContainer}>
             <Ionicons name="list" size={20} color="#fff" />
           </View>
-          <Text style={newStyles.newsTitle}>NEWS</Text>
+          <Text style={newStyles.newsTitle}>News</Text>
           <View style={newStyles.divider} />
         </View>
 
@@ -261,19 +267,15 @@ const NewsScreen = () => {
         </View>
 
         {/* Search and Create Button */}
-        <View style={newStyles.searchContainer}>
-          <TextInput
-            style={newStyles.searchInput}
-            placeholder="Search News..."
-            placeholderTextColor="#999"
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          <TouchableOpacity style={newStyles.createButton}>
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={newStyles.createButtonText}>Create New Article</Text>
-          </TouchableOpacity>
-        </View>
+        {/* <SearchFilter
+          searchText={searchText}
+          setSearchText={setSearchText}
+          placeholder="Search News..."
+          showButton={true}
+          buttonText="Create Article"
+          buttonIcon="add"
+          onButtonPress={handleCreateArticle}
+        /> */}
 
         {/* News Items List */}
         <View style={newStyles.newsList}>

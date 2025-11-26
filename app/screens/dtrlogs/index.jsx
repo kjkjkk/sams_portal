@@ -32,9 +32,9 @@ const dtrLogs = () => {
                   // marginBottom: 18,
                 }}
               >
-                <Ionicons name="time-sharp" size={24} color="#333" />
+                <Ionicons name="time-sharp" size={36} color="#000" />
                 <Text
-                  style={{ fontSize: 20, fontWeight: "bold", marginLeft: 8 }}
+                  style={{ fontSize: 18, fontWeight: "bold", marginLeft: 8 }}
                 >
                   Daily Time Record
                 </Text>

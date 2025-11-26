@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// In your ApiService file
 const API_BASE_URL = "http://192.168.1.104:8000/api";
 
 class ApiService {
@@ -121,6 +120,15 @@ class ApiService {
   }
 
   /**
+   * Get all schools
+   */
+  async getSchools() {
+    return await this.request("/schools", {
+      method: "GET",
+    });
+  }
+
+  /**
    * Logout user and clear token
    */
   async logout() {
@@ -167,25 +175,62 @@ class ApiService {
 
   /**
    * Get all DTR records (for admins)
-   * Falls back to alternative endpoint if primary fails
+   * Returns only DTR records, not user list
    */
   async getAllDTRRecords() {
+    return await this.request("/dtr", {
+      method: "GET",
+    });
+  }
+
+  /**
+   * ✅ NEW: Get ALL users with their DTR summary
+   * This returns ALL active users, even those without DTR records
+   * Each user has: usr_id, emp_name, school_name, acc_id, user_type,
+   *                user_type_name, total_records, latest_date
+   */
+  async getAllUsersWithDTR() {
     try {
-      return await this.request("/dtr", {
-        method: "GET",
-      });
+      console.log("[API] Attempting /users/dtr-summary endpoint...");
+      return await this.request("/users/dtr-summary", { method: "GET" });
     } catch (error) {
-      console.log("[API] Trying fallback endpoint for DTR records...");
-      try {
-        return await this.request("/dtr/all", {
-          method: "GET",
-        });
-      } catch (fallbackError) {
-        console.error("[API] Both DTR endpoints failed:", fallbackError);
-        throw new Error(
-          "DTR endpoint not found. Please check your backend API has GET /dtr or GET /dtr/all endpoint."
-        );
-      }
+      console.error(
+        "[API] /users/dtr-summary failed, falling back to old method"
+      );
+
+      // ✅ FALLBACK: Use old endpoint
+      const dtrResponse = await this.getAllDTRRecords();
+      if (!dtrResponse.success) throw new Error("DTR fetch failed");
+
+      // Convert DTR records to user summary
+      const userMap = new Map();
+      dtrResponse.data.forEach((record) => {
+        const userId = record.emp_id || record.usr_id;
+        if (!userMap.has(userId)) {
+          userMap.set(userId, {
+            usr_id: userId,
+            emp_name: record.emp_name || "Unknown",
+            school_name: record.school_name || "Unknown School",
+            acc_id: record.acc_id,
+            user_type: record.user_type,
+            user_type_name: record.user_type_name || "Unknown",
+            total_records: 1,
+            latest_date: record.tme_date,
+          });
+        } else {
+          const existing = userMap.get(userId);
+          existing.total_records += 1;
+          if (new Date(record.tme_date) > new Date(existing.latest_date)) {
+            existing.latest_date = record.tme_date;
+          }
+        }
+      });
+
+      return {
+        success: true,
+        data: Array.from(userMap.values()),
+        message: "Users retrieved from DTR records (fallback)",
+      };
     }
   }
 }

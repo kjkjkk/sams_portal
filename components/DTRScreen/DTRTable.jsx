@@ -1,10 +1,10 @@
 "use client";
 import { useAuth } from "@/contexts/AuthContexts";
-import { useTheme } from "@/contexts/ThemeContext"; // Add this import
+import { useTheme } from "@/contexts/ThemeContext";
 import ApiService from "@/services/api";
-import { isAdminUser } from "@/utils/roleUtils";
+import { isLMSAdminUser, isSuperAdminUser } from "@/utils/roleUtils";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react"; // Add useMemo
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -14,9 +14,15 @@ import {
   View,
 } from "react-native";
 
-const DTRTable = ({ selectedUserType, searchText }) => {
+const DTRTable = ({
+  selectedUserType,
+  searchText,
+  appliedFromDate,
+  appliedToDate,
+  selectedSchool, // This will come from parent, but we'll override for LMS
+}) => {
   const { user, loading: authLoading } = useAuth();
-  const { theme } = useTheme(); // Get theme from context
+  const { theme } = useTheme();
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage] = useState(10);
   const [allUsers, setAllUsers] = useState([]);
@@ -26,87 +32,162 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   const [error, setError] = useState(null);
   const router = useRouter();
 
-  // Create dynamic styles based on theme
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // ... rest of your existing useEffect hooks and functions remain the same ...
+  // ✅ Determine effective school filter based on user role
+  const effectiveSchoolFilter = useMemo(() => {
+    if (isLMSAdminUser(user?.usrType)) {
+      // LMS Admin can only see their own school
+      return user?.accID;
+    }
+    // Super Admin can see all or selected school
+    return selectedSchool;
+  }, [user?.usrType, user?.accID, selectedSchool]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        console.log("[DTRTable] ===== Fetching all DTR records =====");
+        setError(null);
 
-        const dtrResponse = await ApiService.getAllDTRRecords();
-        console.log("[DTRTable] API Response received");
+        console.log(
+          "[DTRTable] ===== Fetching ALL USERS with DTR summary ====="
+        );
+        console.log("[DTRTable] Current user:", {
+          usrID: user?.usrID,
+          usrType: user?.usrType,
+          accID: user?.accID,
+          isLMS: isLMSAdminUser(user?.usrType),
+          isSuperAdmin: isSuperAdminUser(user?.usrType),
+        });
 
-        if (dtrResponse.success && dtrResponse.data) {
-          const records = dtrResponse.data;
-          console.log("[DTRTable] Total records received:", records.length);
+        // ✅ Use the NEW endpoint that returns ALL users
+        console.log("[DTRTable] Calling getAllUsersWithDTR()...");
+        const response = await ApiService.getAllUsersWithDTR();
+        console.log("[DTRTable] API Response received:", response);
 
-          const userMap = new Map();
+        if (response.success && response.data) {
+          const users = response.data;
+          console.log("[DTRTable] ✅ Total users received:", users.length);
 
-          records.forEach((record) => {
-            const userId = record.emp_id || record.usr_id;
+          // ✅ Log sample user to verify structure
+          if (users.length > 0) {
+            console.log("[DTRTable] Sample user:", users[0]);
+          }
 
-            if (!userMap.has(userId)) {
-              userMap.set(userId, {
-                usr_id: userId,
-                emp_name: record.emp_name || record.user_name || "Unknown",
-                school_name:
-                  record.school_name || record.acc_name || "Unknown School",
-                acc_id: record.acc_id,
-                user_type: record.user_type || record.usrType,
-                user_type_name:
-                  record.user_type_name || record.type_name || "Unknown",
-                total_records: 1,
-                latest_date: record.tme_date,
-              });
-            } else {
-              const existing = userMap.get(userId);
-              existing.total_records += 1;
+          // ✅ Log user types
+          const userTypes = [...new Set(users.map((u) => u.user_type))];
+          console.log("[DTRTable] Unique user types:", userTypes);
 
-              if (new Date(record.tme_date) > new Date(existing.latest_date)) {
-                existing.latest_date = record.tme_date;
-              }
-            }
+          // ✅ Count by type
+          const typeCount = {};
+          users.forEach((u) => {
+            const typeName = u.user_type_name || "Unknown";
+            typeCount[typeName] = (typeCount[typeName] || 0) + 1;
           });
+          console.log("[DTRTable] Users by type:", typeCount);
 
-          const uniqueUsers = Array.from(userMap.values());
-          console.log("[DTRTable] Unique users:", uniqueUsers.length);
-
-          setAllUsers(uniqueUsers);
+          setAllUsers(users);
           setError(null);
         } else {
-          throw new Error(dtrResponse.message || "Failed to fetch DTR records");
+          console.error("[DTRTable] ❌ API returned success=false");
+          throw new Error(response.message || "Failed to fetch users");
         }
       } catch (err) {
-        console.error("[DTRTable] ===== ERROR =====");
-        console.error("[DTRTable] Error message:", err.message);
-        setError(`Failed to load DTR data: ${err.message || "Unknown error"}`);
+        console.error("[DTRTable] ❌ ERROR:", err);
+        console.error("[DTRTable] Error stack:", err.stack);
+        setError(`Failed to load user data: ${err.message}`);
+        setAllUsers([]); // ✅ Set empty array on error
       } finally {
+        console.log("[DTRTable] Setting loading to false");
         setLoading(false);
       }
     };
 
-    if (!authLoading && user && isAdminUser(user.usrType)) {
-      fetchData();
-    } else if (!authLoading && user && !isAdminUser(user.usrType)) {
-      setLoading(false);
+    if (!authLoading && user) {
+      const canViewDTR =
+        isSuperAdminUser(user.usrType) || isLMSAdminUser(user.usrType);
+      console.log(
+        "[DTRTable] Auth check - canViewDTR:",
+        canViewDTR,
+        "userType:",
+        user.usrType
+      );
+
+      if (canViewDTR) {
+        console.log("[DTRTable] ✅ User has permission, fetching data...");
+        fetchData();
+      } else {
+        console.log("[DTRTable] ❌ User does not have permission");
+        setLoading(false);
+      }
+    } else {
+      console.log("[DTRTable] Waiting for auth...", {
+        authLoading,
+        hasUser: !!user,
+      });
     }
   }, [authLoading, user]);
 
+  // ✅ Filter logic - now uses effectiveSchoolFilter
   useEffect(() => {
+    console.log("[DTRTable] ===== Applying Filters =====");
+    console.log("[DTRTable] Total users before filter:", allUsers.length);
+    console.log("[DTRTable] Filters:", {
+      selectedUserType,
+      effectiveSchoolFilter,
+      searchText,
+      appliedFromDate,
+      appliedToDate,
+      userRole: isLMSAdminUser(user?.usrType) ? "LMS Admin" : "Super Admin",
+    });
+
     let filtered = [...allUsers];
 
+    // 1. School Filter (automatically applied for LMS, optional for Super Admin)
+    if (effectiveSchoolFilter !== null && effectiveSchoolFilter !== undefined) {
+      console.log("[DTRTable] Filtering by school:", effectiveSchoolFilter);
+      const beforeCount = filtered.length;
+
+      filtered = filtered.filter((item) => {
+        return Number(item.acc_id) === Number(effectiveSchoolFilter);
+      });
+
+      console.log(
+        `[DTRTable] After school filter: ${filtered.length} (was ${beforeCount})`
+      );
+    }
+
+    // 2. User Type Filter
     if (selectedUserType !== null && selectedUserType !== undefined) {
+      console.log("[DTRTable] Filtering by user type:", selectedUserType);
+      const beforeCount = filtered.length;
+
       filtered = filtered.filter((item) => {
         return Number(item.user_type) === Number(selectedUserType);
       });
+
+      console.log(
+        `[DTRTable] After user type filter: ${filtered.length} (was ${beforeCount})`
+      );
+
+      if (filtered.length > 0) {
+        console.log(
+          "[DTRTable] Sample matched users:",
+          filtered.slice(0, 3).map((u) => ({
+            name: u.emp_name,
+            type: u.user_type,
+            typeName: u.user_type_name,
+          }))
+        );
+      }
     }
 
+    // 3. Search Text Filter
     if (searchText && searchText.trim() !== "") {
       const searchLower = searchText.toLowerCase();
+      const beforeCount = filtered.length;
+
       filtered = filtered.filter((item) => {
         const name = item.emp_name?.toLowerCase() || "";
         const school = item.school_name?.toLowerCase() || "";
@@ -120,50 +201,96 @@ const DTRTable = ({ selectedUserType, searchText }) => {
           id.includes(searchLower)
         );
       });
+
+      console.log(
+        `[DTRTable] After search filter: ${filtered.length} (was ${beforeCount})`
+      );
     }
+
+    // 4. Date Range Filter (only filters users who have latest_date)
+    if (appliedFromDate || appliedToDate) {
+      const beforeCount = filtered.length;
+
+      filtered = filtered.filter((item) => {
+        // ✅ Keep users without DTR records
+        if (!item.latest_date) return true;
+
+        const recordDate = new Date(item.latest_date);
+        recordDate.setHours(0, 0, 0, 0);
+
+        if (appliedFromDate) {
+          const fromDate = new Date(appliedFromDate);
+          fromDate.setHours(0, 0, 0, 0);
+          if (recordDate < fromDate) return false;
+        }
+
+        if (appliedToDate) {
+          const toDate = new Date(appliedToDate);
+          toDate.setHours(0, 0, 0, 0);
+          if (recordDate > toDate) return false;
+        }
+
+        return true;
+      });
+
+      console.log(
+        `[DTRTable] After date filter: ${filtered.length} (was ${beforeCount})`
+      );
+    }
+
+    console.log(
+      "[DTRTable] ===== Final filtered count:",
+      filtered.length,
+      "====="
+    );
 
     setFilteredUsers(filtered);
 
+    // Paginate
     const startIndex = (currentPage - 1) * rowsPerPage;
     const paginated = filtered.slice(startIndex, startIndex + rowsPerPage);
     setDisplayedUsers(paginated);
 
+    // Reset to page 1 if current page is now out of range
     const totalPages = Math.ceil(filtered.length / rowsPerPage);
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [selectedUserType, searchText, currentPage, rowsPerPage, allUsers]);
+  }, [
+    selectedUserType,
+    searchText,
+    appliedFromDate,
+    appliedToDate,
+    effectiveSchoolFilter, // ✅ Now uses effectiveSchoolFilter instead of selectedSchool
+    currentPage,
+    rowsPerPage,
+    allUsers,
+    user,
+  ]);
 
   const handleViewUser = (userId) => {
     if (!userId) {
-      console.error("[DTRTable] No valid user ID found!");
+      console.error("[DTRTable] No valid user ID!");
       return;
     }
-
     router.push({
       pathname: "/screens/dtrlogs",
-      params: {
-        usrId: String(userId),
-      },
+      params: { usrId: String(userId) },
     });
   };
 
   const totalPages = Math.ceil(filteredUsers.length / rowsPerPage) || 1;
 
   const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
   const formatDate = (datetime) => {
-    if (!datetime) return "N/A";
+    if (!datetime) return "No logs yet";
     try {
       const d = new Date(datetime);
       return d.toISOString().split("T")[0];
@@ -181,11 +308,14 @@ const DTRTable = ({ selectedUserType, searchText }) => {
     );
   }
 
-  if (!authLoading && user && !isAdminUser(user.usrType)) {
+  const canViewDTR =
+    isSuperAdminUser(user?.usrType) || isLMSAdminUser(user?.usrType);
+
+  if (!authLoading && user && !canViewDTR) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>
-          You do not have permission to view all DTR records.
+          You do not have permission to view DTR records.
         </Text>
       </View>
     );
@@ -203,6 +333,7 @@ const DTRTable = ({ selectedUserType, searchText }) => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.emptyText}>No users found</Text>
+        <Text style={styles.emptySubtext}>No active users in the system</Text>
       </View>
     );
   }
@@ -210,8 +341,9 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   if (filteredUsers.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.emptyText}>
-          No users match your search criteria
+        <Text style={styles.emptyText}>No users match your filters</Text>
+        <Text style={styles.emptySubtext}>
+          Try adjusting your search criteria
         </Text>
       </View>
     );
@@ -235,11 +367,6 @@ const DTRTable = ({ selectedUserType, searchText }) => {
               Name
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 160 }]}
-            >
-              School
-            </Text>
-            <Text
               style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
             >
               User Type
@@ -250,7 +377,7 @@ const DTRTable = ({ selectedUserType, searchText }) => {
               Total Records
             </Text>
             <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 100 }]}
+              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
             >
               Latest Log
             </Text>
@@ -270,16 +397,13 @@ const DTRTable = ({ selectedUserType, searchText }) => {
               <Text style={[styles.tableCell, { width: 200 }]}>
                 {item.emp_name}
               </Text>
-              <Text style={[styles.tableCell, { width: 160 }]}>
-                {item.school_name}
-              </Text>
               <Text style={[styles.tableCell, { width: 120 }]}>
                 {item.user_type_name}
               </Text>
               <Text style={[styles.tableCell, { width: 100 }]}>
-                {item.total_records}
+                {item.total_records || 0}
               </Text>
-              <Text style={[styles.tableCell, { width: 100 }]}>
+              <Text style={[styles.tableCell, { width: 120 }]}>
                 {formatDate(item.latest_date)}
               </Text>
               <View
@@ -316,11 +440,9 @@ const DTRTable = ({ selectedUserType, searchText }) => {
         >
           <Text style={styles.paginationButtonText}>Previous</Text>
         </Pressable>
-
         <Text style={styles.pageInfo}>
           Page {currentPage} of {totalPages} ({filteredUsers.length} users)
         </Text>
-
         <Pressable
           style={[
             styles.paginationButton,
@@ -336,14 +458,9 @@ const DTRTable = ({ selectedUserType, searchText }) => {
   );
 };
 
-// Move styles to a function that accepts theme
 const createStyles = (theme) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      width: "100%",
-      paddingBottom: 24,
-    },
+    container: { flex: 1, width: "100%", paddingBottom: 24 },
     table: {
       borderWidth: 1,
       borderColor: "#E5E7EB",
@@ -352,8 +469,8 @@ const createStyles = (theme) =>
       backgroundColor: "#FFFFFF",
     },
     tableHeader: {
-      backgroundColor: theme.cardHeader, // Dynamic theme color
-      color: theme.buttonText, // Dynamic theme color
+      backgroundColor: theme.cardHeader,
+      color: theme.buttonText,
       fontWeight: "600",
       paddingVertical: 12,
       paddingHorizontal: 8,
@@ -361,7 +478,7 @@ const createStyles = (theme) =>
     },
     tableCell: {
       fontSize: 12,
-      color: theme.contentText, // Dynamic theme color
+      color: theme.contentText,
       paddingVertical: 12,
       paddingHorizontal: 8,
       borderRightWidth: 1,
@@ -373,20 +490,18 @@ const createStyles = (theme) =>
       borderBottomColor: "#E5E7EB",
       backgroundColor: "#FFFFFF",
     },
-    tableRowAlt: {
-      backgroundColor: "#F9FAFB",
-    },
+    tableRowAlt: { backgroundColor: "#F9FAFB" },
     actionButton: {
       paddingHorizontal: 10,
       paddingVertical: 6,
-      backgroundColor: theme.buttonHover, // Dynamic theme color
+      backgroundColor: theme.buttonHover,
       borderRadius: 4,
       justifyContent: "center",
       alignItems: "center",
     },
     actionButtonText: {
       fontSize: 12,
-      color: theme.buttonText, // Dynamic theme color
+      color: theme.buttonText,
       fontWeight: "600",
     },
     paginationContainer: {
@@ -402,42 +517,27 @@ const createStyles = (theme) =>
     paginationButton: {
       paddingHorizontal: 16,
       paddingVertical: 8,
-      backgroundColor: theme.buttonHover, // Dynamic theme color
+      backgroundColor: theme.buttonHover,
       borderRadius: 6,
     },
-    paginationButtonDisabled: {
-      backgroundColor: "#D1D5DB",
-    },
+    paginationButtonDisabled: { backgroundColor: "#D1D5DB" },
     paginationButtonText: {
-      color: theme.buttonText, // Dynamic theme color
+      color: theme.buttonText,
       fontSize: 12,
       fontWeight: "600",
     },
-    pageInfo: {
-      fontSize: 12,
-      color: "#4B5563",
-      fontWeight: "500",
-    },
+    pageInfo: { fontSize: 12, color: "#4B5563", fontWeight: "500" },
     centerContainer: {
       justifyContent: "center",
       alignItems: "center",
       padding: 24,
       minHeight: 200,
     },
-    errorText: {
-      fontSize: 14,
-      color: "#EF4444",
-      textAlign: "center",
-    },
-    loadingText: {
-      fontSize: 14,
-      color: "#666",
-      marginTop: 8,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: "#999",
-    },
+    errorText: { fontSize: 14, color: "#EF4444", textAlign: "center" },
+    loadingText: { fontSize: 14, color: "#666", marginTop: 8 },
+    emptyText: { fontSize: 14, color: "#999", fontWeight: "600" },
+    emptySubtext: { fontSize: 12, color: "#CCC", marginTop: 4 },
+    cardsScrollView: { marginBottom: 16 },
   });
 
 export default DTRTable;

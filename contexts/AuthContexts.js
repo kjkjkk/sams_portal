@@ -34,19 +34,23 @@ export function AuthProvider({ children }) {
       await AsyncStorage.removeItem("user_data");
       setUser(null);
       setIsAuthenticated(false);
+      console.log("[Auth] ✅ Auth data cleared successfully");
     } catch (error) {
-      console.error("[Auth] Error clearing auth data:", error);
+      console.error("[Auth] ❌ Error clearing auth data:", error);
     }
   };
 
   const checkAuth = async () => {
     try {
-      console.log("[Auth] Checking authentication status...");
+      console.log("[Auth] ===== Checking Authentication =====");
       const token = await AsyncStorage.getItem("auth_token");
       const storedUser = await AsyncStorage.getItem("user_data");
 
+      console.log("[Auth] Token exists:", !!token);
+      console.log("[Auth] Stored user exists:", !!storedUser);
+
       if (!token) {
-        console.log("[Auth] No token found");
+        console.log("[Auth] ❌ No token found - User not authenticated");
         setUser(null);
         setIsAuthenticated(false);
         setLoading(false);
@@ -56,23 +60,28 @@ export function AuthProvider({ children }) {
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
+          console.log("[Auth] Parsed user data:", {
+            usrID: userData.usrID,
+            accID: userData.accID,
+            usrType: userData.usrType,
+            name: `${userData.usrFirstName} ${userData.usrLastName}`,
+          });
 
           // Validate user data structure
           if (userData && userData.usrID && userData.accID) {
             // Set user immediately from storage for faster UI
             setUser(userData);
             setIsAuthenticated(true);
-            console.log("[Auth] User loaded from storage:", {
-              usrID: userData.usrID,
-              name: `${userData.usrFirstName} ${userData.usrLastName}`,
-              accID: userData.accID,
-            });
+            console.log("[Auth] ✅ User loaded from storage");
 
             // Validate token with server in background
             try {
+              console.log("[Auth] Validating token with server...");
               const response = await ApiService.getUser();
+
               if (response.success && response.data) {
                 const updatedUser = response.data;
+                console.log("[Auth] ✅ Token validated, user data updated");
 
                 // Ensure all required fields exist
                 const completeUser = {
@@ -107,29 +116,45 @@ export function AuthProvider({ children }) {
                   "user_data",
                   JSON.stringify(completeUser)
                 );
-                console.log("[Auth] User data updated from server");
               }
             } catch (error) {
               // Token validation failed - token is invalid or expired
-              console.error("[Auth] Token validation failed:", error.message);
+              console.error(
+                "[Auth] ❌ Token validation failed:",
+                error.message
+              );
+              console.error("[Auth] Full error:", error);
 
               // Clear invalid auth data
               await clearAuthData();
               console.log("[Auth] Cleared invalid session");
             }
           } else {
-            console.log("[Auth] Invalid user data structure");
+            console.log(
+              "[Auth] ❌ Invalid user data structure - missing usrID or accID"
+            );
+            console.log("[Auth] User data:", userData);
             await clearAuthData();
           }
         } catch (parseError) {
-          console.error("[Auth] Error parsing stored user data:", parseError);
+          console.error(
+            "[Auth] ❌ Error parsing stored user data:",
+            parseError
+          );
           await clearAuthData();
         }
       } else {
         // Has token but no stored user - try to fetch user
-        console.log("[Auth] Token found but no user data, fetching...");
+        console.log(
+          "[Auth] Token found but no user data, fetching from server..."
+        );
         try {
           const response = await ApiService.getUser();
+          console.log("[Auth] API Response:", {
+            success: response.success,
+            hasData: !!response.data,
+          });
+
           if (response.success && response.data) {
             const userData = response.data;
 
@@ -162,34 +187,64 @@ export function AuthProvider({ children }) {
               "user_data",
               JSON.stringify(completeUser)
             );
-            console.log("[Auth] User fetched and stored");
+            console.log("[Auth] ✅ User fetched and stored");
+          } else {
+            console.log("[Auth] ❌ Failed to fetch user - invalid response");
+            await clearAuthData();
           }
         } catch (error) {
-          console.error("[Auth] Failed to fetch user:", error.message);
+          console.error("[Auth] ❌ Failed to fetch user:", error.message);
+          console.error("[Auth] Full error:", error);
           await clearAuthData();
         }
       }
     } catch (error) {
-      console.error("[Auth] Check auth error:", error);
+      console.error("[Auth] ❌ Check auth error:", error);
       await clearAuthData();
     } finally {
       setLoading(false);
+      console.log("[Auth] ===== Authentication Check Complete =====");
     }
   };
 
   const login = async (username, password) => {
     try {
-      console.log("[Auth] Attempting login for:", username);
+      console.log("[Auth] ===== Login Attempt =====");
+      console.log("[Auth] Username:", username);
+
+      // ✅ Input validation
+      if (!username || !password) {
+        throw new Error("Username and password are required");
+      }
 
       const response = await ApiService.login(username, password);
+      console.log("[Auth] API Login Response:", {
+        success: response.success,
+        hasData: !!response.data,
+        message: response.message,
+      });
 
       if (response.success && response.data) {
         // Backend now returns flat user object in response.data
         const userData = response.data;
 
-        // Validate required fields from users table
-        if (!userData.usrID || !userData.accID) {
-          throw new Error("Invalid user data received from server");
+        // ✅ Enhanced validation with detailed logging
+        console.log("[Auth] User data received:", {
+          usrID: userData.usrID,
+          accID: userData.accID,
+          usrType: userData.usrType,
+          usrFirstName: userData.usrFirstName,
+          usrLastName: userData.usrLastName,
+        });
+
+        if (!userData.usrID) {
+          console.error("[Auth] ❌ Missing usrID in user data");
+          throw new Error("Invalid user data: Missing user ID");
+        }
+
+        if (!userData.accID) {
+          console.error("[Auth] ❌ Missing accID in user data");
+          throw new Error("Invalid user data: Missing account ID");
         }
 
         // User data is already properly structured from backend
@@ -220,31 +275,60 @@ export function AuthProvider({ children }) {
           modCalendar: userData.modCalendar || 0,
         };
 
-        setUser(structuredUser);
-        setIsAuthenticated(true);
-
-        await AsyncStorage.setItem("user_data", JSON.stringify(structuredUser));
-
-        console.log("[Auth] Login successful:", {
+        console.log("[Auth] Structured user:", {
           usrID: structuredUser.usrID,
           name: `${structuredUser.usrFirstName} ${structuredUser.usrLastName}`,
           accID: structuredUser.accID,
           usrType: structuredUser.usrType,
         });
 
+        setUser(structuredUser);
+        setIsAuthenticated(true);
+
+        await AsyncStorage.setItem("user_data", JSON.stringify(structuredUser));
+
+        console.log("[Auth] ✅ Login successful!");
+        console.log("[Auth] ===== Login Complete =====");
+
         return structuredUser;
       } else {
+        console.error("[Auth] ❌ Login failed:", response.message);
         throw new Error(response.message || "Login failed");
       }
     } catch (error) {
-      console.error("[Auth] Login error:", error);
+      console.error("[Auth] ===== Login Error =====");
+      console.error("[Auth] Error type:", error.constructor.name);
+      console.error("[Auth] Error message:", error.message);
+      console.error("[Auth] Full error:", error);
+
+      // ✅ Provide more specific error messages
+      if (error.message.includes("Network")) {
+        throw new Error(
+          "Network error. Please check your internet connection."
+        );
+      } else if (
+        error.message.includes("401") ||
+        error.message.includes("Unauthorized")
+      ) {
+        throw new Error("Invalid username or password.");
+      } else if (
+        error.message.includes("403") ||
+        error.message.includes("Forbidden")
+      ) {
+        throw new Error(
+          "Your account has been disabled. Please contact support."
+        );
+      } else if (error.message.includes("500")) {
+        throw new Error("Server error. Please try again later.");
+      }
+
       throw error;
     }
   };
 
   const logout = async () => {
     try {
-      console.log("[Auth] Logging out...");
+      console.log("[Auth] ===== Logging Out =====");
       await ApiService.logout();
     } catch (error) {
       console.error("[Auth] Logout API error:", error);
@@ -252,7 +336,7 @@ export function AuthProvider({ children }) {
       // Always clear local data even if API call fails
       await clearAuthData();
       router.replace("/");
-      console.log("[Auth] Logout complete");
+      console.log("[Auth] ✅ Logout complete");
     }
   };
 
