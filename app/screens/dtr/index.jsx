@@ -4,12 +4,13 @@ import Header from "@/components/layout/header";
 import SchoolFilter from "@/components/school-filter";
 import SearchFilter from "@/components/search-filter";
 import { useAuth } from "@/contexts/AuthContexts";
-import dtrStyles from "@/styles/appScreenStyles/dtrStyles";
+import { useTheme } from "@/contexts/ThemeContext"; // ✅ Import useTheme
+import createDtrStyles from "@/styles/appScreenStyles/dtrStyles"; // ✅ Import function, not object
 import { isLMSAdminUser } from "@/utils/roleUtils";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import DateFilter from "components/date-range-filter";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Platform,
   SafeAreaView,
@@ -23,6 +24,10 @@ const DTRScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { theme } = useTheme(); // ✅ Get theme from context
+
+  // ✅ Create styles using theme
+  const dtrStyles = useMemo(() => createDtrStyles(theme), [theme]);
 
   const [searchText, setSearchText] = useState("");
   const [selectedUserType, setSelectedUserType] = useState(null);
@@ -139,7 +144,7 @@ const DTRScreen = () => {
 
         {/* DTR Title Section */}
         <View style={dtrStyles.dtrHeaderContainer}>
-          <Ionicons name="time" size={36} color="#000" />
+          <Ionicons name="time" size={36} color={theme.primary} />
           <Text style={dtrStyles.dtrTitle}>Daily Time Record</Text>
           <View style={dtrStyles.divider} />
         </View>
@@ -149,7 +154,11 @@ const DTRScreen = () => {
           {/* ✅ Info Banner - RIGHT ABOVE User Type Filter */}
           {isLMSAdminUser(user?.usrType) && (
             <View style={dtrStyles.infoBanner}>
-              <Ionicons name="information-circle" size={20} color="#F97316" />
+              <Ionicons
+                name="information-circle"
+                size={20}
+                color={theme.primary}
+              />
               <Text style={dtrStyles.infoBannerText}>
                 Viewing DTR records of {schoolName || "your school"}
               </Text>
@@ -176,7 +185,7 @@ const DTRScreen = () => {
                         <Ionicons
                           name="checkmark-circle"
                           size={16}
-                          color="#F97316"
+                          color={theme.primary}
                           style={{ marginRight: 4 }}
                         />
                       )}
