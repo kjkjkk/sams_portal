@@ -43,22 +43,8 @@ const DTRLog = () => {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Click outside handler for web calendars
-  useEffect(() => {
-    if (Platform.OS === "web") {
-      const handleClickOutside = (event) => {
-        if (!event.target.closest(".calendar-container")) {
-          setShowWebFromCalendar(false);
-          setShowWebToCalendar(false);
-        }
-      };
-      if (showWebFromCalendar || showWebToCalendar) {
-        document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-          document.removeEventListener("mousedown", handleClickOutside);
-      }
-    }
-  }, [showWebFromCalendar, showWebToCalendar]);
+  // Removed click outside handler - it was interfering with date selection
+  // The Modal component in DateFilter now handles closing properly
 
   // Date picker handlers
   const showFromDatePicker = () => setFromDatePickerVisibility(true);
@@ -75,12 +61,16 @@ const DTRLog = () => {
   };
 
   const handleSearchFilters = () => {
+    console.log("[DTRLog] Search button clicked");
+    console.log("[DTRLog] filterFromDate:", filterFromDate);
+    console.log("[DTRLog] filterToDate:", filterToDate);
     setAppliedFromDate(filterFromDate);
     setAppliedToDate(filterToDate);
     setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
+    console.log("[DTRLog] Clear filters clicked");
     setFilterFromDate(null);
     setFilterToDate(null);
     setAppliedFromDate(null);
@@ -90,11 +80,41 @@ const DTRLog = () => {
 
   const formatDisplayDate = (date) => {
     if (!date) return "Select Date";
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-    });
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "Select Date";
+      return d.toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      });
+    } catch (error) {
+      console.error("[DTRLog] Error formatting display date:", error);
+      return "Select Date";
+    }
+  };
+
+  // Helper function to parse date string consistently
+  const parseDateString = (dateStr) => {
+    if (!dateStr || dateStr === "N/A") return null;
+    try {
+      // Parse "YYYY-MM-DD" format consistently
+      const parts = dateStr.split("-");
+      if (parts.length !== 3) return null;
+
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+
+      if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+
+      const date = new Date(year, month - 1, day);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    } catch (error) {
+      console.error("[DTRLog] Error parsing date:", dateStr, error);
+      return null;
+    }
   };
 
   // Parse time helper
@@ -118,6 +138,9 @@ const DTRLog = () => {
       return { totalHours: "0", daysPresent: 0, daysAbsent: 0 };
     }
 
+    console.log("[DTRLog] calculateHours called with:", { fromDate, toDate });
+    console.log("[DTRLog] Total records in dtrData:", dtrData.length);
+
     let totalMinutes = 0;
     let daysWithData = new Set();
     let allUniqueDates = new Set();
@@ -127,15 +150,27 @@ const DTRLog = () => {
     if (fromDateObj) fromDateObj.setHours(0, 0, 0, 0);
     if (toDateObj) toDateObj.setHours(23, 59, 59, 999);
 
-    dtrData.forEach((record) => {
-      if (record.date && record.date !== "N/A") {
-        try {
-          const recordDate = new Date(record.date);
-          recordDate.setHours(0, 0, 0, 0);
+    console.log("[DTRLog] Date objects:", { fromDateObj, toDateObj });
 
+    dtrData.forEach((record, index) => {
+      if (record.date && record.date !== "N/A") {
+        // Use the consistent date parser
+        const recordDate = parseDateString(record.date);
+
+        if (recordDate) {
           const isInRange =
             (!fromDateObj || recordDate >= fromDateObj) &&
             (!toDateObj || recordDate <= toDateObj);
+
+          if (index < 3) {
+            console.log(`[DTRLog] Record ${index}:`, {
+              date: record.date,
+              recordDate,
+              isInRange,
+              fromCheck: !fromDateObj || recordDate >= fromDateObj,
+              toCheck: !toDateObj || recordDate <= toDateObj,
+            });
+          }
 
           if (isInRange) {
             allUniqueDates.add(record.date);
@@ -178,8 +213,6 @@ const DTRLog = () => {
             totalMinutes += dayMinutes;
             if (dayMinutes > 0) daysWithData.add(record.date);
           }
-        } catch (e) {
-          console.error("[DTRLog] Error parsing date:", record.date);
         }
       }
     });
@@ -188,6 +221,13 @@ const DTRLog = () => {
     const daysAbsent = Math.max(0, allUniqueDates.size - daysPresent);
     const totalHours = Math.round(totalMinutes / 60).toString();
 
+    console.log("[DTRLog] Calculation results:", {
+      totalHours,
+      daysPresent,
+      daysAbsent,
+      allUniqueDates: allUniqueDates.size,
+    });
+
     return { totalHours, daysPresent, daysAbsent };
   };
 
@@ -195,29 +235,51 @@ const DTRLog = () => {
   const { totalHours, daysPresent, daysAbsent } = allTimeStats;
 
   // Filter data based on applied dates
-  const filteredData = dtrData.filter((record) => {
-    if (!appliedFromDate && !appliedToDate) return true;
-    if (record.date && record.date !== "N/A") {
-      try {
-        const recordDate = new Date(record.date);
-        recordDate.setHours(0, 0, 0, 0);
+  const filteredData = useMemo(() => {
+    console.log("[DTRLog] Filtering data...");
+    console.log("[DTRLog] appliedFromDate:", appliedFromDate);
+    console.log("[DTRLog] appliedToDate:", appliedToDate);
+    console.log("[DTRLog] Total records:", dtrData.length);
+
+    if (!appliedFromDate && !appliedToDate) {
+      console.log("[DTRLog] No filters applied, returning all data");
+      return dtrData;
+    }
+
+    const filtered = dtrData.filter((record) => {
+      if (record.date && record.date !== "N/A") {
+        // Use the consistent date parser
+        const recordDate = parseDateString(record.date);
+
+        if (!recordDate) {
+          console.log("[DTRLog] Failed to parse date:", record.date);
+          return true; // Keep records with invalid dates
+        }
+
         if (appliedFromDate) {
           const fromDate = new Date(appliedFromDate);
           fromDate.setHours(0, 0, 0, 0);
-          if (recordDate < fromDate) return false;
+          if (recordDate < fromDate) {
+            return false;
+          }
         }
+
         if (appliedToDate) {
           const toDate = new Date(appliedToDate);
           toDate.setHours(23, 59, 59, 999);
-          if (recordDate > toDate) return false;
+          if (recordDate > toDate) {
+            return false;
+          }
         }
-        return true;
-      } catch (e) {
+
         return true;
       }
-    }
-    return true;
-  });
+      return true;
+    });
+
+    console.log("[DTRLog] Filtered records:", filtered.length);
+    return filtered;
+  }, [dtrData, appliedFromDate, appliedToDate]);
 
   // Pagination
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -247,10 +309,13 @@ const DTRLog = () => {
         if (isNaN(userIdToFetch))
           throw new Error(`Invalid user ID: ${targetUsrId}`);
 
+        console.log("[DTRLog] Fetching DTR records for user:", userIdToFetch);
         const response = await ApiService.getDTRRecords(userIdToFetch);
 
         if (response.success && response.data && response.data.length > 0) {
           const records = response.data;
+          console.log("[DTRLog] Received", records.length, "records");
+
           const firstRecord = records[0];
           const targetUserFullName = firstRecord.emp_name || "Unknown User";
           const targetUserAccId = firstRecord.acc_id;
@@ -311,6 +376,7 @@ const DTRLog = () => {
             rawAccId: record.acc_id,
           }));
 
+          console.log("[DTRLog] Sample formatted record:", formattedData[0]);
           setDtrData(formattedData);
           setError(null);
         } else {
@@ -466,75 +532,88 @@ const DTRLog = () => {
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.tableScroll, { marginTop: 8 }]}
-      >
-        <View style={styles.table}>
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, styles.tableHeader, { width: 80 }]}>
-              ID
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 200 }]}
-            >
-              Name
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
-            >
-              Time In (AM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
-            >
-              Time Out (AM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
-            >
-              Time In (PM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
-            >
-              Time Out (PM)
-            </Text>
-            <Text
-              style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
-            >
-              Date
-            </Text>
-          </View>
-          {currentData.map((item, index) => (
-            <View
-              key={index}
-              style={[styles.tableRow, index % 2 !== 0 && styles.tableRowAlt]}
-            >
-              <Text style={[styles.tableCell, { width: 80 }]}>{item.id}</Text>
-              <Text style={[styles.tableCell, { width: 200 }]}>
-                {item.name}
+      {filteredData.length === 0 && (appliedFromDate || appliedToDate) ? (
+        <View style={styles.noResultsContainer}>
+          <Text style={styles.noResultsText}>
+            No records match your filters
+          </Text>
+          <Text style={styles.noResultsSubtext}>
+            Try adjusting your date range
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.tableScroll, { marginTop: 8 }]}
+        >
+          <View style={styles.table}>
+            <View style={styles.tableRow}>
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 80 }]}
+              >
+                ID
               </Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>
-                {item.timeInAM}
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 200 }]}
+              >
+                Name
               </Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>
-                {item.timeOutAM}
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+              >
+                Time In (AM)
               </Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>
-                {item.timeInPM}
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+              >
+                Time Out (AM)
               </Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>
-                {item.timeOutPM}
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+              >
+                Time In (PM)
               </Text>
-              <Text style={[styles.tableCell, { width: 120 }]}>
-                {item.date}
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+              >
+                Time Out (PM)
+              </Text>
+              <Text
+                style={[styles.tableCell, styles.tableHeader, { width: 120 }]}
+              >
+                Date
               </Text>
             </View>
-          ))}
-        </View>
-      </ScrollView>
+            {currentData.map((item, index) => (
+              <View
+                key={index}
+                style={[styles.tableRow, index % 2 !== 0 && styles.tableRowAlt]}
+              >
+                <Text style={[styles.tableCell, { width: 80 }]}>{item.id}</Text>
+                <Text style={[styles.tableCell, { width: 200 }]}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.tableCell, { width: 120 }]}>
+                  {item.timeInAM}
+                </Text>
+                <Text style={[styles.tableCell, { width: 120 }]}>
+                  {item.timeOutAM}
+                </Text>
+                <Text style={[styles.tableCell, { width: 120 }]}>
+                  {item.timeInPM}
+                </Text>
+                <Text style={[styles.tableCell, { width: 120 }]}>
+                  {item.timeOutPM}
+                </Text>
+                <Text style={[styles.tableCell, { width: 120 }]}>
+                  {item.date}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
 
       <View style={styles.paginationContainer}>
         <Pressable
@@ -583,6 +662,27 @@ const createStyles = (theme) =>
     },
     debugText: { fontSize: 12, color: "#999", textAlign: "center" },
     emptyText: { fontSize: 14, color: "#999" },
+    noResultsContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 48,
+      backgroundColor: "#FFFFFF",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      marginTop: 8,
+      marginBottom: 24,
+    },
+    noResultsText: {
+      fontSize: 14,
+      color: "#999",
+      fontWeight: "600",
+      marginBottom: 4,
+    },
+    noResultsSubtext: {
+      fontSize: 12,
+      color: "#CCC",
+    },
     cardsScrollContainer: { marginBottom: 7 },
     cardsScrollContent: { flexDirection: "row", gap: 5, paddingRight: 16 },
     chartContainer: { justifyContent: "flex-start", alignItems: "center" },

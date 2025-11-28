@@ -213,7 +213,7 @@ const DTRTable = ({
 
       filtered = filtered.filter((item) => {
         // ✅ Keep users without DTR records
-        if (!item.latest_date) return true;
+        if (!item.latest_date) return false;
 
         const recordDate = new Date(item.latest_date);
         recordDate.setHours(0, 0, 0, 0);
@@ -226,7 +226,7 @@ const DTRTable = ({
 
         if (appliedToDate) {
           const toDate = new Date(appliedToDate);
-          toDate.setHours(0, 0, 0, 0);
+          toDate.setHours(23, 59, 59, 999);
           if (recordDate > toDate) return false;
         }
 

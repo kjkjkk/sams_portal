@@ -9,7 +9,6 @@ import createDtrStyles from "@/styles/appScreenStyles/dtrStyles"; // ✅ Import 
 import { isLMSAdminUser } from "@/utils/roleUtils";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import DateFilter from "components/date-range-filter";
 import { useEffect, useMemo, useState } from "react";
 import {
   Platform,
@@ -211,7 +210,7 @@ const DTRScreen = () => {
             style={dtrStyles.cardsScrollContainer}
             contentContainerStyle={dtrStyles.cardsScrollContent}
           >
-            <DateFilter
+            {/* <DateFilter
               filterFromDate={filterFromDate}
               setFilterFromDate={setFilterFromDate}
               filterToDate={filterToDate}
@@ -233,7 +232,7 @@ const DTRScreen = () => {
               handleClearFilters={handleClearFilters}
               handleSearchFilters={handleSearchFilters}
               formatDisplayDate={formatDisplayDate}
-            />
+            /> */}
 
             {/* ✅ Search Filter Card - No School Filter Inside */}
             <View style={dtrStyles.cardHorizontal}>

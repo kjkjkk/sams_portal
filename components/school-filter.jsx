@@ -107,6 +107,9 @@ const SchoolFilter = ({
 
   return (
     <View style={styles.dropdownWrapper}>
+      <View style={styles.filterHeader}>
+        <Text style={styles.filterTitle}>School Filter</Text>
+      </View>
       <TouchableOpacity
         style={[
           styles.dropdown,
@@ -240,5 +243,14 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     color: "#F97316",
     fontWeight: "600",
+  },
+  filterHeader: {
+    marginBottom: 16,
+    // paddingHorizontal: 16,
+  },
+  filterTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
   },
 });
