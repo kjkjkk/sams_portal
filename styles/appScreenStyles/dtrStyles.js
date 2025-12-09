@@ -328,7 +328,7 @@ const createDtrStyles = (theme) =>
       shadowRadius: 8,
       elevation: 3,
       minWidth: 300,
-      width: 350,
+      width: 400,
     },
     filterHeader: {
       marginBottom: 16,

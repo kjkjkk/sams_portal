@@ -1,4 +1,5 @@
 "use client";
+import SearchFilter from "@/components/search-filter";
 import { useAuth } from "@/contexts/AuthContexts";
 import { useTheme } from "@/contexts/ThemeContext";
 import ApiService from "@/services/api";
@@ -38,13 +39,12 @@ const DTRLog = () => {
   const [showWebToCalendar, setShowWebToCalendar] = useState(false);
   const [webCalendarDate, setWebCalendarDate] = useState(new Date());
 
+  const [searchText, setSearchText] = useState("");
+
   const targetUsrId = params.usrId || params.empId || user?.usrID;
   const isWeb = Platform.OS === "web";
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-
-  // Removed click outside handler - it was interfering with date selection
-  // The Modal component in DateFilter now handles closing properly
 
   // Date picker handlers
   const showFromDatePicker = () => setFromDatePickerVisibility(true);
@@ -98,7 +98,6 @@ const DTRLog = () => {
   const parseDateString = (dateStr) => {
     if (!dateStr || dateStr === "N/A") return null;
     try {
-      // Parse "YYYY-MM-DD" format consistently
       const parts = dateStr.split("-");
       if (parts.length !== 3) return null;
 
@@ -138,9 +137,6 @@ const DTRLog = () => {
       return { totalHours: "0", daysPresent: 0, daysAbsent: 0 };
     }
 
-    console.log("[DTRLog] calculateHours called with:", { fromDate, toDate });
-    console.log("[DTRLog] Total records in dtrData:", dtrData.length);
-
     let totalMinutes = 0;
     let daysWithData = new Set();
     let allUniqueDates = new Set();
@@ -150,27 +146,14 @@ const DTRLog = () => {
     if (fromDateObj) fromDateObj.setHours(0, 0, 0, 0);
     if (toDateObj) toDateObj.setHours(23, 59, 59, 999);
 
-    console.log("[DTRLog] Date objects:", { fromDateObj, toDateObj });
-
-    dtrData.forEach((record, index) => {
+    dtrData.forEach((record) => {
       if (record.date && record.date !== "N/A") {
-        // Use the consistent date parser
         const recordDate = parseDateString(record.date);
 
         if (recordDate) {
           const isInRange =
             (!fromDateObj || recordDate >= fromDateObj) &&
             (!toDateObj || recordDate <= toDateObj);
-
-          if (index < 3) {
-            console.log(`[DTRLog] Record ${index}:`, {
-              date: record.date,
-              recordDate,
-              isInRange,
-              fromCheck: !fromDateObj || recordDate >= fromDateObj,
-              toCheck: !toDateObj || recordDate <= toDateObj,
-            });
-          }
 
           if (isInRange) {
             allUniqueDates.add(record.date);
@@ -221,13 +204,6 @@ const DTRLog = () => {
     const daysAbsent = Math.max(0, allUniqueDates.size - daysPresent);
     const totalHours = Math.round(totalMinutes / 60).toString();
 
-    console.log("[DTRLog] Calculation results:", {
-      totalHours,
-      daysPresent,
-      daysAbsent,
-      allUniqueDates: allUniqueDates.size,
-    });
-
     return { totalHours, daysPresent, daysAbsent };
   };
 
@@ -236,24 +212,16 @@ const DTRLog = () => {
 
   // Filter data based on applied dates
   const filteredData = useMemo(() => {
-    console.log("[DTRLog] Filtering data...");
-    console.log("[DTRLog] appliedFromDate:", appliedFromDate);
-    console.log("[DTRLog] appliedToDate:", appliedToDate);
-    console.log("[DTRLog] Total records:", dtrData.length);
-
     if (!appliedFromDate && !appliedToDate) {
-      console.log("[DTRLog] No filters applied, returning all data");
       return dtrData;
     }
 
     const filtered = dtrData.filter((record) => {
       if (record.date && record.date !== "N/A") {
-        // Use the consistent date parser
         const recordDate = parseDateString(record.date);
 
         if (!recordDate) {
-          console.log("[DTRLog] Failed to parse date:", record.date);
-          return true; // Keep records with invalid dates
+          return true;
         }
 
         if (appliedFromDate) {
@@ -277,15 +245,31 @@ const DTRLog = () => {
       return true;
     });
 
-    console.log("[DTRLog] Filtered records:", filtered.length);
     return filtered;
   }, [dtrData, appliedFromDate, appliedToDate]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  // ✅ ADD THIS: Apply search filter on top of date filter
+  const filteredAndSearchedData = useMemo(() => {
+    if (!searchText.trim()) {
+      return filteredData;
+    }
+
+    const searchLower = searchText.toLowerCase().trim();
+
+    return filteredData.filter((record) => {
+      const nameMatch = record.name?.toLowerCase().includes(searchLower);
+      const idMatch = record.id?.toString().toLowerCase().includes(searchLower);
+      const dateMatch = record.date?.toLowerCase().includes(searchLower);
+
+      return nameMatch || idMatch || dateMatch;
+    });
+  }, [filteredData, searchText]);
+
+  // ✅ CHANGE THIS: Use filteredAndSearchedData instead of filteredData
+  const totalPages = Math.ceil(filteredAndSearchedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = filteredData.slice(startIndex, endIndex);
+  const currentData = filteredAndSearchedData.slice(startIndex, endIndex);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -293,6 +277,11 @@ const DTRLog = () => {
   const handlePreviousPage = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
+
+  // ✅ ADD THIS: Reset to page 1 when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText]);
 
   // Fetch DTR data
   useEffect(() => {
@@ -309,13 +298,10 @@ const DTRLog = () => {
         if (isNaN(userIdToFetch))
           throw new Error(`Invalid user ID: ${targetUsrId}`);
 
-        console.log("[DTRLog] Fetching DTR records for user:", userIdToFetch);
         const response = await ApiService.getDTRRecords(userIdToFetch);
 
         if (response.success && response.data && response.data.length > 0) {
           const records = response.data;
-          console.log("[DTRLog] Received", records.length, "records");
-
           const firstRecord = records[0];
           const targetUserFullName = firstRecord.emp_name || "Unknown User";
           const targetUserAccId = firstRecord.acc_id;
@@ -376,7 +362,6 @@ const DTRLog = () => {
             rawAccId: record.acc_id,
           }));
 
-          console.log("[DTRLog] Sample formatted record:", formattedData[0]);
           setDtrData(formattedData);
           setError(null);
         } else {
@@ -444,7 +429,6 @@ const DTRLog = () => {
     );
   };
 
-  // Loading state
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -454,7 +438,6 @@ const DTRLog = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={styles.centerContainer}>
@@ -466,7 +449,6 @@ const DTRLog = () => {
 
   const displayName = targetUserInfo?.name || "Employee";
 
-  // Empty state
   if (dtrData.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -477,6 +459,13 @@ const DTRLog = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <SearchFilter
+        searchText={searchText}
+        setSearchText={setSearchText}
+        placeholder="Search by name, ID, or date..."
+        showButton={false}
+        showHeader={false}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -532,13 +521,16 @@ const DTRLog = () => {
         </View>
       </View>
 
-      {filteredData.length === 0 && (appliedFromDate || appliedToDate) ? (
+      {/* ✅ CHANGE THIS: Check filteredAndSearchedData and include searchText */}
+      {filteredAndSearchedData.length === 0 &&
+      (appliedFromDate || appliedToDate || searchText) ? (
         <View style={styles.noResultsContainer}>
           <Text style={styles.noResultsText}>
             No records match your filters
           </Text>
           <Text style={styles.noResultsSubtext}>
-            Try adjusting your date range
+            {searchText ? "Try a different search term or " : ""}adjust your
+            date range
           </Text>
         </View>
       ) : (
