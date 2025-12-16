@@ -462,7 +462,7 @@ const createStyles = (theme) =>
   StyleSheet.create({
     container: { flex: 1, width: "100%", paddingBottom: 24 },
     table: {
-      borderWidth: 1,
+      borderWidth: 5,
       borderColor: "#E5E7EB",
       borderRadius: 8,
       overflow: "hidden",

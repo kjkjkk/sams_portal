@@ -681,7 +681,7 @@ const createStyles = (theme) =>
     noDataText: { fontSize: 14, color: "#999" },
     tableScroll: { marginBottom: 24 },
     table: {
-      borderWidth: 1,
+      borderWidth: 5,
       borderColor: "#E5E7EB",
       borderRadius: 8,
       overflow: "hidden",

@@ -1,7 +1,6 @@
 import { useAuth } from "@/contexts/AuthContexts";
-import { useTheme } from "@/contexts/ThemeContext"; // Add this line
+import { useTheme } from "@/contexts/ThemeContext";
 import ApiService from "@/services/api";
-// import headerStyles from "@/styles/layoutStyles/header";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
@@ -9,10 +8,13 @@ import { Image, StyleSheet, Text, View } from "react-native";
 const Header = () => {
   const { user, getUserFullName } = useAuth();
   const [schoolData, setSchoolData] = useState(null);
-  const { theme } = useTheme(); // Add this line
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
 
   const fullName = getUserFullName();
+
+  // Use the same base URL from ApiService (remove /api since images are in public folder)
+  const BACKEND_URL = "http://192.168.1.109:8000";
 
   useEffect(() => {
     const fetchSchoolData = async () => {
@@ -59,7 +61,7 @@ const Header = () => {
 
     if (displayName.toUpperCase() === "UM") {
       return (
-        <Text style={headerStyles.logoText}>
+        <Text style={localStyles.logoText}>
           <Text style={{ color: "#D00000" }}>U</Text>
           <Text style={{ color: "#FFD000" }}>M </Text>
           LMS
@@ -68,7 +70,7 @@ const Header = () => {
     }
     if (displayName.toUpperCase() === "INFINIT") {
       return (
-        <Text style={headerStyles.logoText}>
+        <Text style={localStyles.logoText}>
           <Text style={{ color: "#171717ff" }}>INFIN</Text>
           <Text style={{ color: "#ff8400ff" }}>IT </Text>
           LMS
@@ -77,20 +79,32 @@ const Header = () => {
     }
 
     return (
-      <Text style={[headerStyles.logoText, { color: "#000" }]}>
+      <Text style={[localStyles.logoText, { color: "#000" }]}>
         {displayName} LMS
       </Text>
     );
   };
 
-  // Create dynamic styles based on theme - Add this section
-  const headerStyles = useMemo(
+  // Function to get the image source
+  const getUserImageSource = () => {
+    if (user?.usrImage) {
+      const imageUrl = `${BACKEND_URL}/images/${user.usrImage}`;
+      console.log("[Header] Loading user image from:", imageUrl);
+      // Load from backend public/images folder
+      return { uri: imageUrl };
+    }
+    console.log("[Header] No usrImage found, using default");
+    // Fallback to default image
+    return require("@/assets/images/Imageicn.png");
+  };
+
+  const localStyles = useMemo(
     () =>
       StyleSheet.create({
         header: {
           flexDirection: "row",
           justifyContent: "space-between",
-          backgroundColor: theme.content, // Dynamic
+          backgroundColor: theme.content,
           alignItems: "flex-start",
           paddingHorizontal: 16,
           paddingVertical: 20,
@@ -103,7 +117,7 @@ const Header = () => {
         welcomeText: {
           fontSize: 20,
           fontWeight: "700",
-          color: theme.contentText, // Dynamic
+          color: theme.contentText,
           marginBottom: 12,
           letterSpacing: -0.5,
         },
@@ -116,11 +130,12 @@ const Header = () => {
           width: 44,
           height: 44,
           borderRadius: 22,
+          backgroundColor: "#f0f0f0",
         },
         userName: {
           fontSize: 15,
           fontWeight: "600",
-          color: theme.contentText, // Dynamic
+          color: theme.contentText,
         },
         logoSection: {
           alignItems: "center",
@@ -137,81 +152,26 @@ const Header = () => {
   );
 
   return (
-    <View style={headerStyles.header}>
-      <View style={headerStyles.headerContent}>
-        <Text style={headerStyles.welcomeText}>
+    <View style={localStyles.header}>
+      <View style={localStyles.headerContent}>
+        <Text style={localStyles.welcomeText}>
           Welcome to {getSchoolDisplayName()} LMS
         </Text>
-        <View style={headerStyles.userSection}>
-          {/* <Image
-            source={
-              user?.usrImage
-                ? { uri: user.usrImage }
-                : require("@/assets/images/Imageicn.png")
-            }
-            style={headerStyles.userAvatar}
-          /> */}
+        <View style={localStyles.userSection}>
           <Image
-            source={require("@/assets/images/Imageicn.png")}
-            style={headerStyles.userAvatar}
+            source={getUserImageSource()}
+            style={localStyles.userAvatar}
+            defaultSource={require("@/assets/images/Imageicn.png")}
           />
-          <Text style={headerStyles.userName}>{fullName}</Text>
+          <Text style={localStyles.userName}>{fullName}</Text>
         </View>
       </View>
-      <View style={headerStyles.logoSection}>
+      <View style={localStyles.logoSection}>
         <Ionicons name="bulb" size={48} color="#FF9500" />
         {renderSchoolLogo()}
       </View>
     </View>
   );
 };
-
-const headerStyles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#fafafaff",
-    alignItems: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerContent: {
-    flex: 1,
-  },
-  welcomeText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  userSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  userAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-  },
-  logoSection: {
-    alignItems: "center",
-    gap: 2,
-  },
-  logoText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#666",
-    letterSpacing: 0.5,
-  },
-});
 
 export default Header;
